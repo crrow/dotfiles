@@ -26,7 +26,7 @@ readonly DOTFILES_DIR="${DOTFILES_DIR:-$HOME/code/personal/dotfiles}"
 readonly DOTFILES_REF="${DOTFILES_REF:-main}"
 readonly DOTFILES_REPO="${DOTFILES_REPO:-https://github.com/crrow/dotfiles.git}"
 readonly LOCK_DIR="${TMPDIR:-/tmp}/crrow-dotfiles-install.lock"
-readonly NIX_EXTRA='--extra-experimental-features nix-command --extra-experimental-features flakes'
+readonly NIX_FLAGS=(--extra-experimental-features nix-command --extra-experimental-features flakes)
 
 # ----------------------------------------------------------------- logging ---
 
@@ -111,36 +111,37 @@ install_nix() {
 clone_or_update_repo() {
   log "Repo at $DOTFILES_DIR"
   # `nix run nixpkgs#git` removes the need for git to be pre-installed
-  # (and sidesteps the Xcode CLT stub).
-  local git_cmd; git_cmd="nix $NIX_EXTRA run nixpkgs#git --"
+  # (and sidesteps the Xcode CLT stub). Passed as a bash array so word
+  # boundaries survive our `IFS=$'\n\t'` setting.
+  local -a git_cmd=(nix "${NIX_FLAGS[@]}" run nixpkgs#git --)
 
   if [[ -d "$DOTFILES_DIR/.git" ]]; then
-    update_repo "$git_cmd"
+    update_repo "${git_cmd[@]}"
   else
-    fresh_clone "$git_cmd"
+    fresh_clone "${git_cmd[@]}"
   fi
 }
 
 fresh_clone() {
-  local git_cmd="$1"
+  local -a git_cmd=("$@")
   log "cloning $DOTFILES_REPO → $DOTFILES_DIR (ref=$DOTFILES_REF)"
   mkdir -p "$(dirname "$DOTFILES_DIR")"
-  $git_cmd clone --branch "$DOTFILES_REF" "$DOTFILES_REPO" "$DOTFILES_DIR"
+  "${git_cmd[@]}" clone --branch "$DOTFILES_REF" "$DOTFILES_REPO" "$DOTFILES_DIR"
   ok "cloned"
 }
 
 update_repo() {
-  local git_cmd="$1"
+  local -a git_cmd=("$@")
   # Best-effort: don't blow away the user's local edits.
-  if ! $git_cmd -C "$DOTFILES_DIR" fetch --quiet origin "$DOTFILES_REF"; then
+  if ! "${git_cmd[@]}" -C "$DOTFILES_DIR" fetch --quiet origin "$DOTFILES_REF"; then
     warn "git fetch failed — keeping local copy as-is"
     return
   fi
-  if ! $git_cmd -C "$DOTFILES_DIR" checkout --quiet "$DOTFILES_REF" 2>/dev/null; then
+  if ! "${git_cmd[@]}" -C "$DOTFILES_DIR" checkout --quiet "$DOTFILES_REF" 2>/dev/null; then
     warn "could not checkout $DOTFILES_REF (local changes?) — keeping current branch"
     return
   fi
-  if ! $git_cmd -C "$DOTFILES_DIR" pull --ff-only --quiet; then
+  if ! "${git_cmd[@]}" -C "$DOTFILES_DIR" pull --ff-only --quiet; then
     warn "git pull --ff-only failed (diverged?) — keeping local commits"
     return
   fi
@@ -154,8 +155,7 @@ darwin_rebuild_switch() {
   cd "$DOTFILES_DIR"
   # `nix run nix-darwin#darwin-rebuild` bootstraps nix-darwin itself on first
   # use; from then on the same command keeps converging the system.
-  # shellcheck disable=SC2086  # word-splitting on $NIX_EXTRA is intentional.
-  nix $NIX_EXTRA run nix-darwin/master#darwin-rebuild -- switch --flake .
+  nix "${NIX_FLAGS[@]}" run nix-darwin/master#darwin-rebuild -- switch --flake .
   ok "system converged to declared state"
 }
 
