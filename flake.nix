@@ -35,7 +35,7 @@
               useGlobalPkgs   = true;
               useUserPackages = true;
               extraSpecialArgs = { inherit user; };
-              users.${user}   = import ./modules/home.nix;
+              users.${user}   = import ./modules/home;
             };
           }
         ];
