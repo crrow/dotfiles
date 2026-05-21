@@ -5,7 +5,6 @@
   "scripts": {
     "setup": "bun run src/setup.ts",
     "setup:dry": "bun run src/setup.ts --dry-run",
-    "test:vm": "bun run test/harness.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
