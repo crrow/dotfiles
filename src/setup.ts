@@ -58,10 +58,25 @@ async function sh(cmd: string): Promise<void> {
 
 async function installHomebrew() {
   log.step("Homebrew");
-  if (await has("brew")) { log.ok("already installed"); return; }
+  if (await has("brew")) { log.ok("already installed"); ensureBrewOnPath(); return; }
   if (DRY) { log.skip("would install Homebrew"); return; }
-  await $`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`;
+  // NONINTERACTIVE=1 still requires passwordless sudo. If sudo prompts the
+  // user, that's expected behaviour — brew's installer handles it.
+  await $`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`.env({
+    ...process.env, NONINTERACTIVE: "1",
+  });
+  ensureBrewOnPath();
   log.ok("installed");
+}
+
+function ensureBrewOnPath() {
+  const candidates = ["/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin"];
+  for (const c of candidates) {
+    if (existsSync(`${c}/brew`) && !(process.env.PATH ?? "").split(":").includes(c)) {
+      process.env.PATH = `${c}:${process.env.PATH ?? ""}`;
+      return;
+    }
+  }
 }
 
 // --- 2. Brew packages ----------------------------------------------------------

@@ -102,7 +102,27 @@ async function startVm() {
 }
 
 async function ssh(cmd: string): Promise<string> {
-  return (await $`lume ssh ${CLONE} --timeout 600 -- bash -lc ${cmd}`.text());
+  // Stream output as it arrives so a hung step is visible, and surface stdout
+  // on failure (bun's $ would otherwise swallow it).
+  const proc = Bun.spawn(["lume", "ssh", CLONE, "--timeout", "1800", "--", "bash", "-lc", cmd], {
+    stdout: "pipe", stderr: "pipe",
+  });
+  const out: string[] = [];
+  const decoder = new TextDecoder();
+  const pipe = async (stream: ReadableStream<Uint8Array>, prefix: string) => {
+    for await (const chunk of stream) {
+      const text = decoder.decode(chunk);
+      out.push(text);
+      process.stdout.write(text.split("\n").map((l) => l ? `${prefix}${l}` : l).join("\n"));
+    }
+  };
+  await Promise.all([
+    pipe(proc.stdout, `  ${C.dim}|${C.reset} `),
+    pipe(proc.stderr, `  ${C.dim}|${C.reset} `),
+  ]);
+  const code = await proc.exited;
+  if (code !== 0) throw new Error(`ssh command exited ${code}`);
+  return out.join("");
 }
 
 async function sshCheck(label: string, cmd: string) {
@@ -113,27 +133,38 @@ async function sshCheck(label: string, cmd: string) {
 
 // --- bootstrap script (runs inside the VM) -------------------------------------
 
+// The vanilla macOS VM has no Xcode CLT, no brew, no git, no mise. Homebrew's
+// installer (with NONINTERACTIVE=1) installs CLT for us, but requires
+// passwordless sudo — so we configure it up-front. This is fine in a throwaway
+// test VM; real users hit the usual interactive sudo prompt.
 const BOOTSTRAP = String.raw`
 set -euo pipefail
-export PATH="$HOME/.local/bin:$PATH"
 
-echo "==> install mise"
-if ! command -v mise >/dev/null; then
-  curl -fsSL https://mise.run | sh
+echo "==> enable passwordless sudo for lume (test-only)"
+echo lume | sudo -S sh -c 'echo "lume ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/lume-test && chmod 440 /etc/sudoers.d/lume-test'
+
+echo "==> install Homebrew (this also installs Xcode CLT)"
+if ! command -v brew >/dev/null; then
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
-export PATH="$HOME/.local/bin:$PATH"
+if   [ -x /opt/homebrew/bin/brew ];               then eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [ -x /usr/local/bin/brew ];                  then eval "$(/usr/local/bin/brew shellenv)"
+fi
+
+echo "==> brew install mise git"
+brew install mise git
 
 echo "==> clone dotfiles (${BRANCH})"
 rm -rf "$HOME/dotfiles"
 git clone -b ${BRANCH} ${REPO} "$HOME/dotfiles"
 cd "$HOME/dotfiles"
 
-echo "==> mise install"
+echo "==> mise install (bun)"
 mise trust
 mise install
+eval "$(mise activate bash)"
 
 echo "==> bun install"
-eval "$(mise activate bash)"
 bun install
 
 echo "==> bun run setup"
@@ -175,8 +206,7 @@ async function main() {
     await startVm();
 
     log.step("bootstrap (inside VM)");
-    const out = await ssh(BOOTSTRAP);
-    console.log(out.split("\n").map((l) => `  ${C.dim}|${C.reset} ${l}`).join("\n"));
+    await ssh(BOOTSTRAP);
 
     await verify();
 
