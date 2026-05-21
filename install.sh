@@ -157,11 +157,15 @@ update_via_git() {
 # ------------------------------------------------------------------ switch ---
 
 darwin_rebuild_switch() {
-  log "darwin-rebuild switch --flake ."
-  cd "$DOTFILES_DIR"
-  # `nix run nix-darwin#darwin-rebuild` bootstraps nix-darwin itself on first
-  # use; from then on the same command keeps converging the system.
-  nix "${NIX_FLAGS[@]}" run nix-darwin/master#darwin-rebuild -- switch --flake .
+  log "darwin-rebuild switch --flake $DOTFILES_DIR"
+  # nix-darwin ≥ 25.x requires `darwin-rebuild switch` itself to run as root
+  # (it used to re-exec sudo internally; that path was removed). We invoke
+  # nix via its absolute path because sudo's secure_path strips /nix/...
+  # from PATH. Pass --flake as an absolute path because sudo's cwd is
+  # unreliable.
+  sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
+       /nix/var/nix/profiles/default/bin/nix "${NIX_FLAGS[@]}" \
+       run nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
   ok "system converged to declared state"
 }
 
