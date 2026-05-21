@@ -1,0 +1,11 @@
+# User-level mise config — https://mise.jdx.dev
+# Symlinked from crrow/dotfiles. Project-local toolchains live in each repo's
+# own mise.toml; this file holds globally-available runtimes.
+
+[tools]
+bun  = "latest"
+node = "lts"
+
+[settings]
+experimental    = true
+idiomatic_version_file_enable_tools = ["node"]
