@@ -92,6 +92,26 @@ source_nix_profile() {
 
 # --------------------------------------------------------------------- nix ---
 
+install_homebrew() {
+  log "Homebrew"
+  if command -v brew >/dev/null 2>&1 \
+     || [[ -x /opt/homebrew/bin/brew ]] \
+     || [[ -x /usr/local/bin/brew ]]; then
+    ok "already installed"
+    return
+  fi
+  # Homebrew's installer also installs the Xcode Command Line Tools, so we
+  # don't need a separate `xcode-select --install` GUI dance. It does need
+  # sudo — interactive on a real Mac, passwordless in the VM-test setup.
+  log "Installing Homebrew (needed by nix-darwin's homebrew.casks module)"
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+  if   [[ -x /opt/homebrew/bin/brew ]]; then eval "$(/opt/homebrew/bin/brew shellenv)"
+  elif [[ -x /usr/local/bin/brew    ]]; then eval "$(/usr/local/bin/brew shellenv)"
+  else fail "brew binary missing after install"
+  fi
+  ok "installed"
+}
+
 install_nix() {
   log "Nix"
   if command -v nix >/dev/null 2>&1; then
@@ -163,6 +183,7 @@ darwin_rebuild_switch() {
 main() {
   require_macos
   acquire_lock
+  install_homebrew
   install_nix
   source_nix_profile
   fetch_repo
