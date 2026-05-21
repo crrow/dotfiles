@@ -165,7 +165,7 @@ darwin_rebuild_switch() {
   # unreliable.
   sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
        /nix/var/nix/profiles/default/bin/nix "${NIX_FLAGS[@]}" \
-       run nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
+       run nix-darwin/master#darwin-rebuild -- switch --flake "${DOTFILES_DIR}#default"
   ok "system converged to declared state"
 }
 
