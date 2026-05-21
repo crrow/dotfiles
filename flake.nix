@@ -18,12 +18,10 @@
   outputs = { self, nixpkgs, nix-darwin, home-manager, ... }:
     let
       # Hardcoded — fork and edit one line if you're not crrow.
-      user     = "crrow";
-      hostname = "default";
-      system   = "aarch64-darwin";
-    in {
-      # Build with:  darwin-rebuild switch --flake .#default
-      darwinConfigurations.${hostname} = nix-darwin.lib.darwinSystem {
+      user   = "crrow";
+      system = "aarch64-darwin";
+
+      mkDarwin = nix-darwin.lib.darwinSystem {
         inherit system;
         specialArgs = { inherit user; };
         modules = [
@@ -32,16 +30,26 @@
           home-manager.darwinModules.home-manager
           {
             home-manager = {
-              useGlobalPkgs   = true;
-              useUserPackages = true;
+              useGlobalPkgs    = true;
+              useUserPackages  = true;
               extraSpecialArgs = { inherit user; };
-              users.${user}   = import ./modules/home;
+              users.${user}    = import ./modules/home;
             };
           }
         ];
       };
 
-      # Convenience: `nix fmt` formats the flake with nixpkgs-fmt.
+      # darwin-rebuild auto-resolves to darwinConfigurations.$hostname.
+      # Expose the same config under every hostname we want this dotfiles
+      # repo to drive — add yours here when you set one up.
+      hostnames = [
+        "default"                 # explicit `--flake .#default`
+        "lumes-Virtual-Machine"   # lume's vanilla macOS VM (testing)
+      ];
+    in {
+      darwinConfigurations = nixpkgs.lib.genAttrs hostnames (_: mkDarwin);
+
+      # `nix fmt` formats the flake with nixpkgs-fmt.
       formatter.${system} = nixpkgs.legacyPackages.${system}.nixpkgs-fmt;
     };
 }

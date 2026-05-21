@@ -61,19 +61,22 @@ breaks at newlines. **Do not wrap with `script -q`** — it makes bash
 interactive and echoes every line.
 
 ```bash
+# All three are externally configurable. Defaults match the lume image.
 HOST_PROXY="${HOST_PROXY:-http://10.0.0.1:7890}"
+VM_USER="${VM_USER:-lume}"
+VM_PASSWORD="${VM_PASSWORD:-lume}"     # lume's bake-in default; change at your fork
 
 cat > /tmp/dotfiles-bootstrap.sh <<EOF
 #!/bin/bash
 set -euo pipefail
 
-echo "==> enable passwordless sudo for lume"
-echo lume | sudo -S -v   # prime the timestamp cache once
-sudo tee /etc/sudoers.d/lume-test >/dev/null <<'SUDOERS'
-lume ALL=(ALL) NOPASSWD: ALL
+echo "==> enable passwordless sudo for ${VM_USER}"
+echo '${VM_PASSWORD}' | sudo -S -v   # prime the timestamp cache once
+sudo tee /etc/sudoers.d/dotfiles-test >/dev/null <<'SUDOERS'
+${VM_USER} ALL=(ALL) NOPASSWD: ALL
 Defaults env_keep += "HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY no_proxy"
 SUDOERS
-sudo chmod 440 /etc/sudoers.d/lume-test
+sudo chmod 440 /etc/sudoers.d/dotfiles-test
 
 echo "==> route through host proxy ${HOST_PROXY}"
 export HTTP_PROXY="${HOST_PROXY}"  HTTPS_PROXY="${HOST_PROXY}"
