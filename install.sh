@@ -111,47 +111,28 @@ install_nix() {
 fetch_repo() {
   log "Repo at $DOTFILES_DIR (ref=$DOTFILES_REF)"
 
-  # Already a git checkout? Try to update in place. We can't do this without
-  # git, so detect git first; if absent we fall through to a tarball refresh.
-  if [[ -d "$DOTFILES_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
-    update_via_git
+  # If a checkout is already here, do NOT touch it — the user may have
+  # local edits, an in-progress branch, or commits they haven't pushed.
+  # Updates are an explicit, manual operation: `cd $DOTFILES_DIR && git pull`.
+  if [[ -f "$DOTFILES_DIR/flake.nix" ]]; then
+    ok "repo already present — leaving as-is (run 'git pull' to update)"
     return
   fi
 
-  # No git yet (vanilla macOS), or no existing checkout. Use a tarball — it
-  # avoids the Xcode CLT stub AND the cost of materialising a `nix run
-  # nixpkgs#git` closure just to clone one tiny repo. git itself lands later
-  # when nix-darwin builds Home Manager.
-  fresh_tarball
-}
-
-fresh_tarball() {
+  # First install — fetch as a GitHub tarball. Avoids the Xcode CLT stub
+  # detour (no git needed) and the cost of materialising a `nix run
+  # nixpkgs#git` closure just to clone one tiny repo. git lands later via
+  # Home Manager; the user can `git init && git remote add origin …` then.
   local owner_repo tar_url
   owner_repo=$(printf '%s' "$DOTFILES_REPO" | sed -E 's#.*github\.com[:/]([^/]+/[^/.]+)(\.git)?#\1#')
   tar_url="https://codeload.github.com/${owner_repo}/tar.gz/refs/heads/${DOTFILES_REF}"
-  log "downloading $tar_url"
 
+  log "downloading $tar_url"
   rm -rf "$DOTFILES_DIR"
   mkdir -p "$DOTFILES_DIR"
   # --strip-components=1 unwraps GitHub's `<repo>-<sha>/...` top dir.
   curl -fsSL "$tar_url" | tar -xz -C "$DOTFILES_DIR" --strip-components=1
-  ok "fetched as tarball"
-}
-
-update_via_git() {
-  if ! git -C "$DOTFILES_DIR" fetch --quiet origin "$DOTFILES_REF"; then
-    warn "git fetch failed — keeping local copy as-is"
-    return
-  fi
-  if ! git -C "$DOTFILES_DIR" checkout --quiet "$DOTFILES_REF" 2>/dev/null; then
-    warn "could not checkout $DOTFILES_REF (local changes?) — keeping current branch"
-    return
-  fi
-  if ! git -C "$DOTFILES_DIR" pull --ff-only --quiet; then
-    warn "git pull --ff-only failed (diverged?) — keeping local commits"
-    return
-  fi
-  ok "up-to-date with origin/$DOTFILES_REF"
+  ok "fetched"
 }
 
 # ------------------------------------------------------------------ switch ---
