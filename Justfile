@@ -1,65 +1,34 @@
 # Justfile for crrow/dotfiles — manual VM control.
-# Spins up a vanilla macOS VM via lume so you can SSH in and try the bootstrap
-# by hand (helpful for iterating on `src/setup.ts` or `home/**`).
+# Spins up a vanilla macOS VM via lume so you can SSH in and try the
+# bootstrap by hand. All non-trivial logic lives in scripts/*.ts —
+# the recipes here are thin shims.
 #
 # Run `just` to list targets.
 
 set shell := ["bash", "-cu"]
 
-baseline := "dotfiles-test"
-vm       := "dotfiles-run"
-image    := "macos-sequoia-vanilla-sparse:latest"
-
 default:
     @just --list
 
-# Ensure the read-only baseline VM exists. Pulls ~22 GB if missing (one-off).
+# Pull the read-only baseline VM image if missing (~22 GB, one-off).
 baseline:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if lume ls | awk '{print $1}' | grep -qx '{{baseline}}'; then
-      echo "baseline {{baseline}} already present"
-    else
-      lume pull {{image}} {{baseline}}
-    fi
+    bun run scripts/vm-baseline.ts
 
-# Clone the baseline into a fresh working VM and wait until SSH is up.
-vm-up: baseline
-    #!/usr/bin/env bash
-    set -euo pipefail
-    pkill -f 'lume run {{vm}}' 2>/dev/null || true
-    sleep 1
-    lume stop {{vm}} >/dev/null 2>&1 || true
-    lume delete {{vm}} --force >/dev/null 2>&1 || true
-    lume clone {{baseline}} {{vm}}
-    nohup lume run {{vm}} --no-display >/tmp/lume-{{vm}}.log 2>&1 &
-    echo "started: pid=$! log=/tmp/lume-{{vm}}.log"
-    for i in $(seq 1 60); do
-      if lume ssh {{vm}} --timeout 5 -- echo ready 2>/dev/null | grep -q ready; then
-        echo "ssh up after ${i} attempts"
-        echo
-        echo "VM ready. Default creds: lume / lume"
-        echo "  just vm-ssh    # open an interactive shell inside"
-        echo "  just vm-down   # stop + delete"
-        exit 0
-      fi
-      sleep 5
-    done
-    echo "FAIL: VM did not become ssh-able within 5 min" >&2
-    exit 1
+# Clone baseline → start a working VM → wait for SSH. VNC opens automatically.
+vm-up:
+    bun run scripts/vm-up.ts
 
-# Open an interactive SSH session into the running VM.
+# Open an interactive SSH session into the running VM (creds: lume / lume).
 vm-ssh:
-    lume ssh {{vm}}
+    lume ssh dotfiles-run
 
-# Stop and delete the working VM. Baseline is kept.
+# Re-open the VNC screen if you closed it.
+vm-vnc:
+    bun run scripts/vm-vnc.ts
+
+# Stop and delete the working VM (baseline kept).
 vm-down:
-    #!/usr/bin/env bash
-    lume stop {{vm}} >/dev/null 2>&1 || true
-    pkill -f 'lume run {{vm}}' 2>/dev/null || true
-    sleep 1
-    lume delete {{vm}} --force >/dev/null 2>&1 || true
-    echo "{{vm}} removed (baseline {{baseline}} kept)"
+    bun run scripts/vm-down.ts
 
 # List all lume VMs.
 vm-ls:
