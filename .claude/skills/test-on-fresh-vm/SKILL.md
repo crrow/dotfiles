@@ -116,10 +116,16 @@ PROXY
 
 echo "==> install Homebrew (installs Xcode CLT)"
 if ! command -v brew >/dev/null; then
-  NONINTERACTIVE=1 /bin/bash -c "\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  # Homebrew's installer ends with a post-install \`brew update\` that can fail
+  # ("Failed during: brew update --force --quiet") even when brew itself is
+  # fully usable — exit code is non-zero. Tolerate it; verify the binary below.
+  NONINTERACTIVE=1 /bin/bash -c "\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
 fi
 if   [ -x /opt/homebrew/bin/brew ]; then eval "\$(/opt/homebrew/bin/brew shellenv)"
 elif [ -x /usr/local/bin/brew ];    then eval "\$(/usr/local/bin/brew shellenv)"
+else
+  echo "FAIL: brew binary not present after install attempt" >&2
+  exit 1
 fi
 
 echo "==> brew install mise git"
@@ -156,22 +162,35 @@ the outside. That's cosmetic — let it run.
 
 Each of these must succeed. The first failure is the bug.
 
+Split into two passes because `bash -lc` and `zsh -lc` do NOT load
+`~/.zshrc`, so anything activated there (mise shims, OMZ plugins)
+won't be visible. Use `zsh -ic` (interactive) for the second pass.
+
 ```bash
+# Pass 1 — files-and-symlinks (shell-agnostic)
 lume ssh dotfiles-run --timeout 30 -- bash -lc '
   set -e
   test -L $HOME/.zshrc                                       # zshrc symlinked
   readlink $HOME/.zshrc | grep -q dotfiles/home/.zshrc       # to our repo
-  test -L $HOME/.config/ghostty/config                       # ghostty
-  test -L $HOME/.config/starship.toml                        # starship
-  test -L $HOME/.config/zellij/config.kdl                    # zellij
+  test -L $HOME/.config/ghostty/config
+  test -L $HOME/.config/starship.toml
+  test -L $HOME/.config/zellij/config.kdl
   command -v starship
   command -v zellij
   command -v mise
-  command -v bun
   test -d $HOME/.oh-my-zsh
   test -d $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions
-  echo PASS
+  test -d $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+  echo PASS-1
 '
+
+# Pass 2 — shell-activated tools (mise-managed: bun, node, …).
+# Note: zsh -ic emits a few benign "(eval):1: can't change option: zle"
+# warnings from OMZ when stdin/stdout aren't a TTY — ignore them.
+lume ssh dotfiles-run --timeout 30 -- '/opt/homebrew/bin/zsh -ic "
+  command -v bun && bun --version || { echo FAIL bun; exit 1; }
+  echo PASS-2
+"'
 ```
 
 ### 5. Teardown
@@ -216,8 +235,23 @@ download.
 - **`script -q /dev/null bash` makes bash interactive** under the pty —
   each input line gets echoed back like a typing demo. Don't.
 
-- **`lume ssh` default timeout is 60 s.** Bootstrap takes 5-15 min.
-  Use `--timeout 3600`.
+- **`lume ssh` default timeout is 60 s.** Full bootstrap (CLT + brew +
+  formulae + clone + mise + bun + setup, all via proxy) is ~15-30 min on
+  the first run. Use `--timeout 3600`. If the SSH session hits the
+  timeout near the tail end (e.g. during `chsh`), the dotfiles part is
+  usually already done — verify state, don't blindly restart.
+
+- **Homebrew's installer exits non-zero on a non-fatal `brew update`
+  warning.** Wrap `NONINTERACTIVE=1 /bin/bash -c "$(curl ...)"` in `|| true`
+  and check for `/opt/homebrew/bin/brew` after. Without `|| true` the
+  outer `set -e` script terminates before any of the remaining steps
+  (mise/git install, clone, setup.ts) run, leaving brew installed but
+  nothing else.
+
+- **`bash -lc` and `zsh -lc` do NOT load `.zshrc`** (login-but-not-
+  interactive). mise activation lives in `.zshrc`, so its shims aren't
+  on PATH under `-lc`. For checks that depend on `.zshrc` side effects
+  (mise-managed binaries like bun), use `zsh -ic` instead.
 
 - **`lume ssh` output is buffered** because remote stdout is a pipe,
   not a TTY. macOS has no `stdbuf`; live streaming would need real PTY
