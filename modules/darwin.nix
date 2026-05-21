@@ -4,8 +4,9 @@
   ###
   ### Nix daemon + flakes
   ###
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-  nix.settings.trusted-users = [ "@admin" user ];
+  # Determinate Nix manages its own daemon — let it. nix-darwin would
+  # otherwise fight it during activation.
+  nix.enable = false;
 
   ###
   ### User + base system
