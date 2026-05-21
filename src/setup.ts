@@ -48,11 +48,10 @@ async function has(cmd: string): Promise<boolean> {
   return (await $`command -v ${cmd}`.nothrow().quiet()).exitCode === 0;
 }
 
-async function run(strings: TemplateStringsArray, ...values: unknown[]): Promise<void> {
-  // Note: bun's $ template handles quoting.
-  const cmd = String.raw({ raw: strings }, ...values.map(String));
+async function sh(cmd: string): Promise<void> {
   if (DRY) { log.skip(`[dry] ${cmd}`); return; }
-  await $({ raw: strings }, ...values);
+  // Single argv passed to bash -c — safe because we never interpolate user input.
+  await $`bash -c ${cmd}`;
 }
 
 // --- 1. Homebrew ---------------------------------------------------------------
@@ -72,11 +71,11 @@ const CASKS_DARWIN = ["ghostty"];
 
 async function installPackages() {
   log.step("brew formulae");
-  for (const f of FORMULAE) await run`brew install ${f}`;
+  for (const f of FORMULAE) await sh(`brew install ${f}`);
 
   if (OS === "darwin") {
     log.step("brew casks (macOS)");
-    for (const c of CASKS_DARWIN) await run`brew install --cask ${c}`;
+    for (const c of CASKS_DARWIN) await sh(`brew install --cask ${c}`);
   }
 }
 
@@ -109,7 +108,7 @@ async function installOhMyZsh() {
   for (const { name, repo } of PLUGINS) {
     const dest = join(OMZ_PLUGINS_DIR, name);
     if (existsSync(dest)) { log.ok(name); continue; }
-    await run`git clone --depth=1 ${repo} ${dest}`;
+    await sh(`git clone --depth=1 ${repo} ${dest}`);
   }
 }
 
