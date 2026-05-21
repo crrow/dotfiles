@@ -108,40 +108,46 @@ install_nix() {
 
 # -------------------------------------------------------------------- repo ---
 
-clone_or_update_repo() {
-  log "Repo at $DOTFILES_DIR"
-  # `nix run nixpkgs#git` removes the need for git to be pre-installed
-  # (and sidesteps the Xcode CLT stub). Passed as a bash array so word
-  # boundaries survive our `IFS=$'\n\t'` setting.
-  local -a git_cmd=(nix "${NIX_FLAGS[@]}" run nixpkgs#git --)
+fetch_repo() {
+  log "Repo at $DOTFILES_DIR (ref=$DOTFILES_REF)"
 
-  if [[ -d "$DOTFILES_DIR/.git" ]]; then
-    update_repo "${git_cmd[@]}"
-  else
-    fresh_clone "${git_cmd[@]}"
+  # Already a git checkout? Try to update in place. We can't do this without
+  # git, so detect git first; if absent we fall through to a tarball refresh.
+  if [[ -d "$DOTFILES_DIR/.git" ]] && command -v git >/dev/null 2>&1; then
+    update_via_git
+    return
   fi
+
+  # No git yet (vanilla macOS), or no existing checkout. Use a tarball — it
+  # avoids the Xcode CLT stub AND the cost of materialising a `nix run
+  # nixpkgs#git` closure just to clone one tiny repo. git itself lands later
+  # when nix-darwin builds Home Manager.
+  fresh_tarball
 }
 
-fresh_clone() {
-  local -a git_cmd=("$@")
-  log "cloning $DOTFILES_REPO → $DOTFILES_DIR (ref=$DOTFILES_REF)"
-  mkdir -p "$(dirname "$DOTFILES_DIR")"
-  "${git_cmd[@]}" clone --branch "$DOTFILES_REF" "$DOTFILES_REPO" "$DOTFILES_DIR"
-  ok "cloned"
+fresh_tarball() {
+  local owner_repo tar_url
+  owner_repo=$(printf '%s' "$DOTFILES_REPO" | sed -E 's#.*github\.com[:/]([^/]+/[^/.]+)(\.git)?#\1#')
+  tar_url="https://codeload.github.com/${owner_repo}/tar.gz/refs/heads/${DOTFILES_REF}"
+  log "downloading $tar_url"
+
+  rm -rf "$DOTFILES_DIR"
+  mkdir -p "$DOTFILES_DIR"
+  # --strip-components=1 unwraps GitHub's `<repo>-<sha>/...` top dir.
+  curl -fsSL "$tar_url" | tar -xz -C "$DOTFILES_DIR" --strip-components=1
+  ok "fetched as tarball"
 }
 
-update_repo() {
-  local -a git_cmd=("$@")
-  # Best-effort: don't blow away the user's local edits.
-  if ! "${git_cmd[@]}" -C "$DOTFILES_DIR" fetch --quiet origin "$DOTFILES_REF"; then
+update_via_git() {
+  if ! git -C "$DOTFILES_DIR" fetch --quiet origin "$DOTFILES_REF"; then
     warn "git fetch failed — keeping local copy as-is"
     return
   fi
-  if ! "${git_cmd[@]}" -C "$DOTFILES_DIR" checkout --quiet "$DOTFILES_REF" 2>/dev/null; then
+  if ! git -C "$DOTFILES_DIR" checkout --quiet "$DOTFILES_REF" 2>/dev/null; then
     warn "could not checkout $DOTFILES_REF (local changes?) — keeping current branch"
     return
   fi
-  if ! "${git_cmd[@]}" -C "$DOTFILES_DIR" pull --ff-only --quiet; then
+  if ! git -C "$DOTFILES_DIR" pull --ff-only --quiet; then
     warn "git pull --ff-only failed (diverged?) — keeping local commits"
     return
   fi
@@ -166,7 +172,7 @@ main() {
   acquire_lock
   install_nix
   source_nix_profile
-  clone_or_update_repo
+  fetch_repo
   darwin_rebuild_switch
   log "done"
   dim "open a new shell to pick up your new \$SHELL/\$PATH"
