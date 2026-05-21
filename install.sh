@@ -27,9 +27,7 @@ readonly DOTFILES_REF="${DOTFILES_REF:-main}"
 readonly DOTFILES_REPO="${DOTFILES_REPO:-https://github.com/crrow/dotfiles.git}"
 readonly LOCK_DIR="${TMPDIR:-/tmp}/crrow-dotfiles-install.lock"
 readonly DOTFILES_USER="${DOTFILES_USER:-$USER}"
-# --impure lets flake.nix read $DOTFILES_USER via builtins.getEnv. We sandbox
-# what it reads to that single var; nothing in the build itself is impure.
-readonly NIX_FLAGS=(--extra-experimental-features nix-command --extra-experimental-features flakes --impure)
+readonly NIX_FLAGS=(--extra-experimental-features nix-command --extra-experimental-features flakes)
 
 # ----------------------------------------------------------------- logging ---
 
@@ -147,10 +145,13 @@ darwin_rebuild_switch() {
   # nix via its absolute path because sudo's secure_path strips /nix/...
   # from PATH. Pass --flake as an absolute path because sudo's cwd is
   # unreliable.
+  # --impure (after `run`) lets flake.nix read $DOTFILES_USER via
+  # builtins.getEnv. The only impurity is that one var lookup; the build
+  # itself is fully deterministic.
   sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
        env DOTFILES_USER="$DOTFILES_USER" \
        /nix/var/nix/profiles/default/bin/nix "${NIX_FLAGS[@]}" \
-       run nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
+       run --impure nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
   ok "system converged to declared state"
 }
 
