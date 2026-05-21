@@ -26,7 +26,10 @@ readonly DOTFILES_DIR="${DOTFILES_DIR:-$HOME/code/personal/dotfiles}"
 readonly DOTFILES_REF="${DOTFILES_REF:-main}"
 readonly DOTFILES_REPO="${DOTFILES_REPO:-https://github.com/crrow/dotfiles.git}"
 readonly LOCK_DIR="${TMPDIR:-/tmp}/crrow-dotfiles-install.lock"
-readonly NIX_FLAGS=(--extra-experimental-features nix-command --extra-experimental-features flakes)
+readonly DOTFILES_USER="${DOTFILES_USER:-$USER}"
+# --impure lets flake.nix read $DOTFILES_USER via builtins.getEnv. We sandbox
+# what it reads to that single var; nothing in the build itself is impure.
+readonly NIX_FLAGS=(--extra-experimental-features nix-command --extra-experimental-features flakes --impure)
 
 # ----------------------------------------------------------------- logging ---
 
@@ -145,6 +148,7 @@ darwin_rebuild_switch() {
   # from PATH. Pass --flake as an absolute path because sudo's cwd is
   # unreliable.
   sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
+       env DOTFILES_USER="$DOTFILES_USER" \
        /nix/var/nix/profiles/default/bin/nix "${NIX_FLAGS[@]}" \
        run nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
   ok "system converged to declared state"

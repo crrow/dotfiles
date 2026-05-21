@@ -17,9 +17,18 @@
 
   outputs = { self, nixpkgs, nix-darwin, home-manager, ... }:
     let
-      # Hardcoded — fork and edit one line if you're not crrow.
-      user   = "crrow";
       system = "aarch64-darwin";
+
+      # User is read from $DOTFILES_USER (with $USER as fallback) so the
+      # same flake works for any login name. Requires `--impure` on the
+      # nix CLI — install.sh passes that flag.
+      user = let
+        fromEnv = builtins.getEnv "DOTFILES_USER";
+        fromUser = builtins.getEnv "USER";
+      in
+        if fromEnv != "" then fromEnv
+        else if fromUser != "" then fromUser
+        else "crrow";
 
       mkDarwin = nix-darwin.lib.darwinSystem {
         inherit system;
@@ -40,11 +49,11 @@
       };
 
       # darwin-rebuild auto-resolves to darwinConfigurations.$hostname.
-      # Expose the same config under every hostname we want this dotfiles
-      # repo to drive — add yours here when you set one up.
+      # Expose the same config under every hostname we want this flake to
+      # drive; add yours here when you set up a new machine.
       hostnames = [
-        "default"                 # explicit `--flake .#default`
-        "lumes-Virtual-Machine"   # lume's vanilla macOS VM (testing)
+        "default"                # explicit `--flake .#default`
+        "lumes-Virtual-Machine"  # lume's vanilla macOS VM (testing)
       ];
     in {
       darwinConfigurations = nixpkgs.lib.genAttrs hostnames (_: mkDarwin);
