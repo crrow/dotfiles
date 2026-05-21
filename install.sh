@@ -28,6 +28,7 @@ readonly DOTFILES_REPO="${DOTFILES_REPO:-https://github.com/crrow/dotfiles.git}"
 readonly LOCK_DIR="${TMPDIR:-/tmp}/crrow-dotfiles-install.lock"
 readonly DOTFILES_USER="${DOTFILES_USER:-$USER}"
 readonly NIX_FLAGS=(--extra-experimental-features nix-command --extra-experimental-features flakes)
+readonly USER_FILE_REL=".user"   # at repo root; flake.nix reads it
 
 # ----------------------------------------------------------------- logging ---
 
@@ -139,19 +140,21 @@ fetch_repo() {
 # ------------------------------------------------------------------ switch ---
 
 darwin_rebuild_switch() {
+  # Tell the flake which user is the primary one — written to ./.user so
+  # darwin-rebuild's inner nix invocations see it (env vars wouldn't
+  # cross that boundary; see comment in flake.nix).
+  printf '%s\n' "$DOTFILES_USER" > "$DOTFILES_DIR/$USER_FILE_REL"
+  log "set $USER_FILE_REL → $DOTFILES_USER"
+
   log "darwin-rebuild switch --flake $DOTFILES_DIR"
   # nix-darwin ≥ 25.x requires `darwin-rebuild switch` itself to run as root
   # (it used to re-exec sudo internally; that path was removed). We invoke
   # nix via its absolute path because sudo's secure_path strips /nix/...
   # from PATH. Pass --flake as an absolute path because sudo's cwd is
   # unreliable.
-  # --impure (after `run`) lets flake.nix read $DOTFILES_USER via
-  # builtins.getEnv. The only impurity is that one var lookup; the build
-  # itself is fully deterministic.
   sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
-       env DOTFILES_USER="$DOTFILES_USER" \
        /nix/var/nix/profiles/default/bin/nix "${NIX_FLAGS[@]}" \
-       run --impure nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
+       run nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
   ok "system converged to declared state"
 }
 

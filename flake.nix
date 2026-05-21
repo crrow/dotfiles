@@ -19,16 +19,17 @@
     let
       system = "aarch64-darwin";
 
-      # User is read from $DOTFILES_USER (with $USER as fallback) so the
-      # same flake works for any login name. Requires `--impure` on the
-      # nix CLI — install.sh passes that flag.
-      user = let
-        fromEnv = builtins.getEnv "DOTFILES_USER";
-        fromUser = builtins.getEnv "USER";
-      in
-        if fromEnv != "" then fromEnv
-        else if fromUser != "" then fromUser
-        else "crrow";
+      # User comes from ./.user (one line, the login name) if it exists,
+      # else "crrow". install.sh writes .user on first bootstrap so the
+      # same flake works for any login (lume in the VM, crrow on my Mac,
+      # any name on a fork). The file is gitignored — it's per-machine.
+      #
+      # We read a file instead of `builtins.getEnv` because --impure only
+      # applies to the outermost nix invocation; darwin-rebuild re-invokes
+      # nix internally and that subprocess wouldn't see the var.
+      user = if builtins.pathExists ./.user
+             then builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile ./.user)
+             else "crrow";
 
       mkDarwin = nix-darwin.lib.darwinSystem {
         inherit system;

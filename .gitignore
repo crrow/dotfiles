@@ -1,3 +1,5 @@
 .DS_Store
 result
 result-*
+# per-machine login name written by install.sh; flake.nix reads it.
+/.user
