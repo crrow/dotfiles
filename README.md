@@ -1,85 +1,89 @@
 # dotfiles
 
-Personal dev environment. macOS first. Driven by a tiny bash bootstrap
-(`install.sh`) that exists only to install Homebrew + bun on a vanilla
-machine — every other step is TypeScript.
+Personal macOS environment as a [Nix flake](https://nixos.wiki/wiki/Flakes).
+[nix-darwin](https://github.com/LnL7/nix-darwin) declares system-level state
+(macOS defaults, Homebrew casks); [Home Manager](https://github.com/nix-community/home-manager)
+declares the user-level stuff (CLI tools, zsh, prompt, dotfiles).
+
+Idempotent by construction — every run converges the system toward the
+declared state. Re-running `darwin-rebuild switch` is always safe.
 
 ## What's inside
 
-- **Shell**: zsh + oh-my-zsh + [starship](https://starship.rs) prompt
-- **Terminal**: [Ghostty](https://ghostty.org)
-- **Multiplexer**: [zellij](https://zellij.dev)
-- **Runtime manager**: [mise](https://mise.jdx.dev) (for bun, node, …)
-- **Installer**: bun + TypeScript (`scripts/install.ts` + `src/setup.ts`)
-
-## Layout
-
-```
-.
-├── install.sh           # ~20-line bash bootstrap (brew + bun → TS)
-├── scripts/
-│   ├── install.ts       # brew install git, clone repo, hand off to setup
-│   └── vm-*.ts          # local VM control for testing on a clean macOS
-├── src/setup.ts         # installs formulae/casks, OMZ, symlinks, chsh
-├── mise.toml            # pins bun for project tooling
-└── home/                # everything here is symlinked into $HOME
-    ├── .zshrc
-    └── .config/
-        ├── ghostty/config
-        ├── starship.toml
-        ├── zellij/config.kdl
-        └── mise/config.toml
-```
-
-Anything under `home/` is symlinked into `$HOME` preserving the relative
-path. Existing files are backed up to `*.bak-<ts>` before being replaced.
+- **System** (`modules/darwin.nix`): macOS defaults (Dock, Finder, key repeat,
+  …), Homebrew bridge for casks (Ghostty)
+- **User** (`modules/home.nix`): zsh + oh-my-zsh + [starship](https://starship.rs),
+  [zellij](https://zellij.dev), [mise](https://mise.jdx.dev), git (with delta),
+  fzf, bat, eza, fd, ripgrep
+- **Terminal**: [Ghostty](https://ghostty.org) (cask) with config in
+  `modules/home.nix`
 
 ## Bootstrap on a new macOS
 
-One line, from a fresh user shell. You'll be prompted for your sudo
-password once (Homebrew needs it):
+One line, from a fresh user shell:
 
 ```sh
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/crrow/dotfiles/main/install.sh)"
 ```
 
-That's it. What happens, in order:
+What happens:
 
-1. `install.sh` installs Homebrew (which installs Xcode Command Line
-   Tools non-interactively) and `bun`.
-2. It fetches `scripts/install.ts` and execs it under bun.
-3. `scripts/install.ts` `brew install`s git, clones this repo to
-   `~/code/personal/dotfiles`, then runs `bun install` + `bun run setup`.
-4. `src/setup.ts` installs the rest of the formulae and casks, sets up
-   oh-my-zsh + plugins, symlinks everything under `home/` into `$HOME`,
-   and switches your login shell to brew zsh.
+1. `install.sh` installs [Determinate Nix](https://determinate.systems/nix) if
+   `nix` isn't already on PATH.
+2. Clones this repo to `~/code/personal/dotfiles` (uses `nix run nixpkgs#git`
+   so no Xcode CLT detour is needed).
+3. Runs `darwin-rebuild switch --flake .` — Nix builds the entire system
+   profile (CLI tools, Home Manager links, Homebrew casks) and activates it.
 
-Open a new shell when it's done.
+Open a new shell when it's done. The login shell is now Nix-managed zsh with
+mise + starship + OMZ wired up.
 
 Env knobs: `DOTFILES_DIR` (default `~/code/personal/dotfiles`),
 `DOTFILES_REF` (default `main`).
 
 ## Day-to-day
 
-Edit files under `home/` directly — they're the live source, the symlinks
-point here. To add a new tool, edit `FORMULAE` / `CASKS_DARWIN` in
-`src/setup.ts` and re-run `bun run setup`.
-
-To re-run the whole bootstrap against a different ref:
-
 ```sh
-DOTFILES_REF=my-branch /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/crrow/dotfiles/main/install.sh)"
+cd ~/code/personal/dotfiles
+$EDITOR modules/home.nix              # change something
+darwin-rebuild switch --flake .        # apply
+
+nix flake update                       # bump pinned inputs
+darwin-rebuild switch --flake .
 ```
 
-Dry-run setup.ts only (skip brew/cask installs, just show what would symlink):
+`darwin-rebuild switch` will roll back automatically if activation fails —
+nothing partial gets left on disk.
 
-```sh
-bun run setup:dry
+## Layout
+
+```
+.
+├── install.sh           # bash bootstrap: Determinate Nix → clone → switch
+├── flake.nix            # entry point: inputs (nixpkgs / nix-darwin / HM) + outputs
+├── flake.lock           # pinned input revisions (committed)
+├── modules/
+│   ├── darwin.nix       # nix-darwin: system defaults + Homebrew casks
+│   └── home.nix         # Home Manager: user CLI + zsh / starship / zellij / git
+├── Justfile             # local VM control for testing on a clean macOS
+├── .claude/skills/      # how Claude verifies bootstrap on a fresh VM
+└── README.md
 ```
 
 ## Testing on a fresh macOS VM
 
-`Justfile` has targets that spin up a vanilla macOS VM via
-[lume](https://github.com/trycua/cua) and let you verify the bootstrap
-end-to-end. See the recipes (`just`) and the skill at
-`.claude/skills/test-on-fresh-vm/` for the proven workflow + gotchas.
+`Justfile` spins up a vanilla macOS VM via
+[lume](https://github.com/trycua/cua):
+
+```sh
+just baseline   # one-off ~22 GB image pull
+just vm-up      # clone baseline → start → wait for SSH (VNC pops automatically)
+just vm-ssh     # interactive shell (creds: lume / lume)
+just vm-vnc     # re-open VNC if you closed it
+just vm-down    # stop + delete the working VM
+```
+
+Inside the VM you'd run the same one-liner from "Bootstrap on a new macOS"
+above. See `.claude/skills/test-on-fresh-vm/SKILL.md` for the full
+end-to-end verification workflow including known gotchas (lume NAT DNS
+quirks, proxy setup).
