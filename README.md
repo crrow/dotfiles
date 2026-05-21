@@ -1,24 +1,28 @@
 # dotfiles
 
-Personal dev environment. macOS first, Linux compatible. Driven by a single
-TypeScript installer (`src/setup.ts`) running on Bun — no chezmoi, no bash logic.
+Personal dev environment. macOS first. Driven by a tiny bash bootstrap
+(`install.sh`) that exists only to install Homebrew + bun on a vanilla
+machine — every other step is TypeScript.
 
 ## What's inside
 
 - **Shell**: zsh + oh-my-zsh + [starship](https://starship.rs) prompt
 - **Terminal**: [Ghostty](https://ghostty.org)
 - **Multiplexer**: [zellij](https://zellij.dev)
-- **Runtime manager**: [mise](https://mise.jdx.dev) (manages bun, node, …)
-- **Installer**: bun + TypeScript (`src/setup.ts`)
+- **Runtime manager**: [mise](https://mise.jdx.dev) (for bun, node, …)
+- **Installer**: bun + TypeScript (`scripts/install.ts` + `src/setup.ts`)
 
 ## Layout
 
 ```
 .
-├── mise.toml             # pins bun for the installer itself
-├── package.json
-├── src/setup.ts          # the installer
-└── home/                 # everything here is symlinked into $HOME
+├── install.sh           # ~20-line bash bootstrap (brew + bun → TS)
+├── scripts/
+│   ├── install.ts       # brew install git, clone repo, hand off to setup
+│   └── vm-*.ts          # local VM control for testing on a clean macOS
+├── src/setup.ts         # installs formulae/casks, OMZ, symlinks, chsh
+├── mise.toml            # pins bun for project tooling
+└── home/                # everything here is symlinked into $HOME
     ├── .zshrc
     └── .config/
         ├── ghostty/config
@@ -27,35 +31,55 @@ TypeScript installer (`src/setup.ts`) running on Bun — no chezmoi, no bash log
         └── mise/config.toml
 ```
 
-Anything under `home/` is symlinked into `$HOME` preserving the relative path.
-Existing files are backed up to `*.bak-<ts>` before being replaced.
+Anything under `home/` is symlinked into `$HOME` preserving the relative
+path. Existing files are backed up to `*.bak-<ts>` before being replaced.
 
-## Bootstrap on a new machine
+## Bootstrap on a new macOS
+
+One line, from a fresh user shell. You'll be prompted for your sudo
+password once (Homebrew needs it):
 
 ```sh
-# 1. mise (only thing that has to come from outside)
-command -v mise >/dev/null || curl https://mise.run | sh
-export PATH="$HOME/.local/bin:$PATH"
-
-# 2. Clone and enter
-git clone https://github.com/crrow/dotfiles.git ~/code/personal/dotfiles
-cd ~/code/personal/dotfiles
-
-# 3. Install bun via mise, then run the TS installer
-mise trust
-mise install
-bun install
-bun run setup
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/crrow/dotfiles/main/install.sh)"
 ```
 
-Dry-run first if you want to see what would happen:
+That's it. What happens, in order:
+
+1. `install.sh` installs Homebrew (which installs Xcode Command Line
+   Tools non-interactively) and `bun`.
+2. It fetches `scripts/install.ts` and execs it under bun.
+3. `scripts/install.ts` `brew install`s git, clones this repo to
+   `~/code/personal/dotfiles`, then runs `bun install` + `bun run setup`.
+4. `src/setup.ts` installs the rest of the formulae and casks, sets up
+   oh-my-zsh + plugins, symlinks everything under `home/` into `$HOME`,
+   and switches your login shell to brew zsh.
+
+Open a new shell when it's done.
+
+Env knobs: `DOTFILES_DIR` (default `~/code/personal/dotfiles`),
+`DOTFILES_REF` (default `main`).
+
+## Day-to-day
+
+Edit files under `home/` directly — they're the live source, the symlinks
+point here. To add a new tool, edit `FORMULAE` / `CASKS_DARWIN` in
+`src/setup.ts` and re-run `bun run setup`.
+
+To re-run the whole bootstrap against a different ref:
+
+```sh
+DOTFILES_REF=my-branch /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/crrow/dotfiles/main/install.sh)"
+```
+
+Dry-run setup.ts only (skip brew/cask installs, just show what would symlink):
 
 ```sh
 bun run setup:dry
 ```
 
-## Day-to-day
+## Testing on a fresh macOS VM
 
-Edit files under `home/` directly — they're the live source, the symlinks
-point here. To add a new tool to the brew install list, edit `FORMULAE` /
-`CASKS_DARWIN` in `src/setup.ts` and re-run `bun run setup`.
+`Justfile` has targets that spin up a vanilla macOS VM via
+[lume](https://github.com/trycua/cua) and let you verify the bootstrap
+end-to-end. See the recipes (`just`) and the skill at
+`.claude/skills/test-on-fresh-vm/` for the proven workflow + gotchas.
