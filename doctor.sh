@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# init.sh — doctor for the crrow/dotfiles development environment.
+# doctor.sh — health check for the crrow/dotfiles development environment.
 #
 # Run this at the start of a session (or after `git pull`) to verify the
 # host has everything needed to develop on / apply this flake. It does

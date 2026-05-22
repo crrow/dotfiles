@@ -15,6 +15,21 @@ image    := "macos-sequoia-vanilla-sparse:latest"
 default:
     @just --list
 
+# ─── day-to-day ────────────────────────────────────────────────────────────
+
+# Read-only health check: nix/git/darwin-rebuild present, flake evaluates, VM ready.
+doctor:
+    @./doctor.sh
+
+# Pull latest main and converge the system to the new declared state.
+update:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git pull --ff-only
+    darwin-rebuild switch --flake .
+
+# ─── VM testing ────────────────────────────────────────────────────────────
+
 # Pull the read-only baseline VM image if missing (~22 GB, one-off).
 baseline:
     #!/usr/bin/env bash

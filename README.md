@@ -45,9 +45,11 @@ Env knobs: `DOTFILES_DIR` (default `~/code/personal/dotfiles`),
 
 ```sh
 cd ~/code/personal/dotfiles
-$EDITOR modules/home.nix              # change something
+just doctor                            # verify host is healthy (read-only)
+$EDITOR modules/home.nix               # change something
 darwin-rebuild switch --flake .        # apply
 
+just update                            # git pull + switch
 nix flake update                       # bump pinned inputs
 darwin-rebuild switch --flake .
 ```
@@ -60,6 +62,7 @@ nothing partial gets left on disk.
 ```
 .
 ├── install.sh           # bash bootstrap: Determinate Nix → clone → switch
+├── doctor.sh            # read-only health check (or: just doctor)
 ├── flake.nix            # entry point: inputs (nixpkgs / nix-darwin / HM) + outputs
 ├── flake.lock           # pinned input revisions (committed)
 ├── modules/
