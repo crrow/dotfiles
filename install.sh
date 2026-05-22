@@ -244,15 +244,14 @@ post_install_window_manager() {
     fi
   fi
 
-  # (b) Start launchd agents via each tool's built-in --start-service. Why
-  # not `brew services start`? The asmvik yabai/skhd fork's brew formula
-  # doesn't define a service plist ("Formula yabai has not implemented
-  # #plist or #service"), so brew services start errors out. Each binary
-  # ships its own --start-service / --restart-service subcommands that
-  # write the launchd plist to ~/Library/LaunchAgents/ and load it.
-  # Idempotent — re-loading is a no-op.
+  # (b) Start launchd agents. The asmvik yabai/skhd fork's brew formula
+  # doesn't define a service plist, so we use each tool's built-in
+  # --start-service subcommand (writes ~/Library/LaunchAgents/*.plist
+  # and loads it). FelixKratz's sketchybar formula DOES define a service
+  # plist but the binary has no --start-service flag, so we use
+  # `brew services start` for that one. Both paths idempotent.
   local svc started=()
-  for svc in yabai skhd sketchybar; do
+  for svc in yabai skhd; do
     command -v "$svc" >/dev/null 2>&1 || continue
     if "$svc" --start-service >/dev/null 2>&1; then
       started+=("$svc")
@@ -260,6 +259,13 @@ post_install_window_manager() {
       warn "$svc --start-service failed"
     fi
   done
+  if command -v sketchybar >/dev/null 2>&1; then
+    if brew services start sketchybar >/dev/null 2>&1; then
+      started+=(sketchybar)
+    else
+      warn "brew services start sketchybar failed"
+    fi
+  fi
   if (( ${#started[@]} )); then
     ok "launchd agents started: ${started[*]}"
   fi
@@ -282,7 +288,7 @@ post_install_window_manager() {
 
     log "restarting yabai / skhd / sketchybar to pick up the consent"
     local svc
-    for svc in yabai skhd sketchybar; do
+    for svc in yabai skhd; do
       command -v "$svc" >/dev/null 2>&1 || continue
       if "$svc" --restart-service >/dev/null 2>&1; then
         ok "$svc restarted"
@@ -290,6 +296,13 @@ post_install_window_manager() {
         warn "$svc restart failed — try: $svc --restart-service"
       fi
     done
+    if command -v sketchybar >/dev/null 2>&1; then
+      if brew services restart sketchybar >/dev/null 2>&1; then
+        ok "sketchybar restarted"
+      else
+        warn "sketchybar restart failed — try: brew services restart sketchybar"
+      fi
+    fi
   else
     warn "no tty — grant access manually, then:"
     dim "    brew services restart yabai skhd sketchybar"
