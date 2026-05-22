@@ -42,6 +42,12 @@
             home-manager = {
               useGlobalPkgs    = true;
               useUserPackages  = true;
+              # If $HOME has a file that conflicts with one HM wants to
+              # symlink (common on fresh installs: a pre-existing .zshrc /
+              # .gitconfig / etc), rename it to <name>.hm-backup instead of
+              # aborting activation. Without this, the first switch on a
+              # populated $HOME fails noisily.
+              backupFileExtension = "hm-backup";
               extraSpecialArgs = { inherit user; };
               users.${user}    = import ./modules/home;
             };
@@ -56,10 +62,26 @@
         "default"                # explicit `--flake .#default`
         "lumes-Virtual-Machine"  # lume's vanilla macOS VM (testing)
       ];
+      pkgs = nixpkgs.legacyPackages.${system};
     in {
       darwinConfigurations = nixpkgs.lib.genAttrs hostnames (_: mkDarwin);
 
-      # `nix fmt` formats the flake with nixpkgs-fmt.
-      formatter.${system} = nixpkgs.legacyPackages.${system}.nixpkgs-fmt;
+      # `nix fmt` formats the flake with nixfmt — the RFC 166 community
+      # standard. Older Nix code (and this flake's earlier revisions) used
+      # nixpkgs-fmt; nixfmt-rfc-style is the canonical successor and the
+      # one nix.dev recommends.
+      formatter.${system} = pkgs.nixfmt-rfc-style;
+
+      # `nix develop` drops you into a shell with the tools needed to
+      # work *on* this repo (format / lint .nix files). These are dev-time
+      # only — they don't belong in home.packages because they're not part
+      # of the daily Mac environment, just this repo's editing workflow.
+      devShells.${system}.default = pkgs.mkShellNoCC {
+        packages = [
+          pkgs.nixfmt-rfc-style  # `nix fmt` formatter (RFC 166)
+          pkgs.statix            # lint: Nix anti-patterns
+          pkgs.deadnix           # lint: unused bindings / imports
+        ];
+      };
     };
 }
