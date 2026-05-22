@@ -215,6 +215,35 @@ post_install_window_manager() {
     done
   fi
 
+  # (a2) SbarLua: the sketchybar Lua bindings (sketchybar.so) the user's
+  # config requires via helpers/init.lua. Not on luarocks/nixpkgs; build
+  # from upstream. Idempotent — skip if already built.
+  if [[ -f "$HOME/.config/sketchybar/sketchybarrc" ]] \
+     && [[ ! -f "$HOME/.local/share/sketchybar_lua/sketchybar.so" ]] \
+     && command -v lua >/dev/null 2>&1 \
+     && command -v luarocks >/dev/null 2>&1; then
+    log "build SbarLua (sketchybar.so for the Lua config)"
+    local tmpdir
+    tmpdir=$(mktemp -d -t sbarlua)
+    trap 'rm -rf "$tmpdir"' RETURN
+    if (cd "$tmpdir" \
+        && git clone --depth 1 https://github.com/FelixKratz/SbarLua.git \
+        && cd SbarLua && make install) >/dev/null 2>&1; then
+      ok "SbarLua installed to ~/.local/share/sketchybar_lua/"
+    else
+      warn "SbarLua build failed (sketchybar will render empty bar)"
+    fi
+    # Companion: lunajson is a pure-Lua dep referenced by some bar items.
+    if ! luarocks --lua-version 5.5 list 2>/dev/null | grep -q lunajson; then
+      log "luarocks install lunajson"
+      if luarocks --lua-version 5.5 install lunajson >/dev/null 2>&1; then
+        ok "lunajson installed"
+      else
+        warn "lunajson install failed"
+      fi
+    fi
+  fi
+
   # (b) Start launchd agents via each tool's built-in --start-service. Why
   # not `brew services start`? The asmvik yabai/skhd fork's brew formula
   # doesn't define a service plist ("Formula yabai has not implemented
