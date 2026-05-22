@@ -1,31 +1,39 @@
 { ... }:
 
 {
-  # Home Manager has no programs.ghostty module yet; write the config file
-  # directly. When upstream lands the module, migrate to its options.
+  # Home Manager has no programs.ghostty module yet; write config + shader
+  # files directly. Source matches ~/Library/Application Support/com.mitchellh.ghostty/config
+  # on the host this flake was written for.
   home.file.".config/ghostty/config".text = ''
-    font-family = "JetBrainsMono Nerd Font"
-    font-size   = 14
-    theme       = "GruvboxDarkHard"
+    cursor-style                   = bar
+    cursor-opacity                 = 0.8
+    cursor-invert-fg-bg            = true
 
-    window-padding-x        = 12
-    window-padding-y        = 12
-    window-padding-balance  = true
-    window-decoration       = true
-    macos-titlebar-style    = tabs
+    font-family                    = "SeriousShanns Nerd Font Mono"
+    font-size                      = 14
+    font-thicken                   = true
 
-    cursor-style       = block
-    cursor-style-blink = false
+    macos-titlebar-style           = tabs
+    window-height                  = 30
+    window-width                   = 110
 
-    scrollback-limit        = 100000
-    copy-on-select          = clipboard
-    mouse-hide-while-typing = true
+    # Look and feel
+    adjust-cursor-thickness        = 3
+    adjust-underline-position      = 3
+    bold-is-bright                 = true
+    link-url                       = true
+    mouse-hide-while-typing        = true
+    window-vsync                   = true
+    background-opacity             = 0.8
+    background-blur                = true
 
-    shell-integration          = zsh
-    shell-integration-features = cursor,sudo,title
-
-    keybind = cmd+t=new_tab
-    keybind = cmd+w=close_surface
-    keybind = cmd+k=clear_screen
+    # Shader (bundled in repo; symlinked via home.file below)
+    custom-shader-animation        = always
+    custom-shader                  = shaders/just-snow.glsl
   '';
+
+  # Ghostty resolves `custom-shader = shaders/X.glsl` relative to the
+  # config file location. Symlink the shader next to it.
+  home.file.".config/ghostty/shaders/just-snow.glsl".source =
+    ../../ghostty/shaders/just-snow.glsl;
 }
