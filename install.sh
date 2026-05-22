@@ -219,13 +219,34 @@ post_install_window_manager() {
   fi
 
   # (c) Accessibility consent — required for any input-grabbing tool.
-  # Can't be granted from a script (SIP). Open the right pane and prompt.
-  if command -v yabai >/dev/null 2>&1; then
-    log "Accessibility consent (one-time, manual)"
-    dim "  System Settings → Privacy & Security → Accessibility"
-    dim "  Tick yabai, skhd, sketchybar — then:"
+  # SIP-protected TCC.db; only the user can tick the boxes. We open the
+  # right pane, wait for them to do it, then restart the services so the
+  # newly-granted permission takes effect. The same pattern Homebrew uses
+  # for its own interactive prompts.
+  command -v yabai >/dev/null 2>&1 || return
+  log "Accessibility consent (one-time, manual)"
+  dim "  System Settings will open at Privacy & Security → Accessibility."
+  dim "  Tick yabai, skhd, sketchybar; then come back here and press ENTER."
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" 2>/dev/null || true
+
+  if [[ -t 0 ]]; then
+    # /dev/tty bypasses the curl|bash piped stdin pattern — we always want
+    # the keystroke from the user's terminal, not the curl output.
+    read -rp "    Press ENTER when ready (or Ctrl-C to skip)... " </dev/tty || return
+
+    log "restarting yabai / skhd / sketchybar to pick up the consent"
+    local svc
+    for svc in yabai skhd sketchybar; do
+      command -v "$svc" >/dev/null 2>&1 || continue
+      if "$brew_bin" services restart "$svc" >/dev/null 2>&1; then
+        ok "$svc restarted"
+      else
+        warn "$svc restart failed — try: brew services restart $svc"
+      fi
+    done
+  else
+    warn "no tty — grant access manually, then:"
     dim "    brew services restart yabai skhd sketchybar"
-    open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" 2>/dev/null || true
   fi
 }
 
