@@ -178,6 +178,68 @@ download.
   works. With passwordless sudo configured (step above), the installer
   proceeds without prompting at all.
 
+### Install-script + Nix design gotchas
+
+These bit during the first end-to-end run of `install.sh` itself.
+Each cost a re-roll of the VM.
+
+- **`IFS=$'\n\t'` breaks unquoted variable splitting.** If you store a
+  multi-word command in `cmd="nix --foo run …"` and call `$cmd arg`,
+  word splitting normally splits on spaces and runs nix correctly. With
+  `IFS=$'\n\t'` (best-practice safety setting) it doesn't, so the
+  whole string is treated as one program name → `command not found`.
+  **Use bash arrays** (`local -a cmd=(nix --foo run …)`) and `"${cmd[@]}"`.
+
+- **`nix run nixpkgs#git -- clone` realises the entire git closure on
+  first use** — hundreds of MB. On constrained / NAT-NAT networks this
+  can stall for 30+ minutes before the actual clone runs. Use
+  `curl + tar` against `codeload.github.com/<owner>/<repo>/tar.gz/refs/heads/<ref>`
+  for the bootstrap fetch. After `darwin-rebuild switch` lands git via
+  HM, you can `git init` retroactively if you want history.
+
+- **`darwin-rebuild switch` must run as root** (nix-darwin 25.x+
+  removed its internal sudo re-exec). Invoke via `sudo /nix/.../bin/nix
+  run nix-darwin#darwin-rebuild -- switch --flake "$DIR"`. Use the
+  absolute path because sudo's `secure_path` strips `/nix/...` from
+  PATH; pass `--flake` as an absolute path because sudo's cwd is
+  unreliable.
+
+- **`darwin-rebuild` ignores `#fragment` and uses `$(hostname)`.**
+  `--flake X#default` doesn't override darwin-rebuild's hostname-based
+  resolution. Either alias multiple hostnames in `flake.nix`
+  (`darwinConfigurations = lib.genAttrs [ "default" "lumes-Virtual-Machine" … ] (_: mkDarwin);`)
+  or have install.sh detect the hostname and accept a config that name.
+
+- **Hardcoded user breaks across machines.** `system.primaryUser =
+  "crrow"` aborts activation on any other machine ("primary user crrow
+  does not exist"). Two patterns work:
+    1. `builtins.getEnv "DOTFILES_USER"` — needs `--impure` and only
+       works for the outermost `nix` call. `darwin-rebuild` spawns
+       inner nix processes for the build, and those don't see the
+       `--impure` flag → the env var read returns empty mid-build.
+       **This pattern is unreliable for darwin-rebuild.**
+    2. Write `./.user` (one line, the login) at the repo root and
+       `builtins.readFile ./.user`. Pure Nix, no `--impure`, survives
+       darwin-rebuild's process boundary. Gitignore the file. ← **use
+       this.**
+
+- **`--impure` is a subcommand flag, not global.** `nix --impure run X`
+  errors with `unrecognised flag '--impure'`. Position: `nix run --impure X`.
+
+- **`nix.enable = false` is required with Determinate Nix.**
+  nix-darwin defaults to managing its own nix daemon. With Determinate
+  also installed, activation aborts: "Determinate detected … set
+  `nix.enable = false;`". Add it to `modules/darwin.nix`. You lose the
+  declarative `nix.*` settings (substituters etc), but Determinate's
+  installer already wires those up.
+
+- **`homebrew.casks` requires `brew` to already be installed.**
+  nix-darwin's homebrew module *bridges* to an existing brew, it
+  doesn't install one. Without brew, activation aborts: "Using the
+  homebrew module requires homebrew installed". install.sh has to run
+  Homebrew's installer (which also handles Xcode CLT) *before*
+  `darwin-rebuild switch`.
+
 ## When this isn't enough
 
 - **Driving GUI apps** (verify Ghostty actually launches, dock settings
