@@ -192,10 +192,11 @@ fetch_repo() {
 post_install_window_manager() {
   log "window-manager post-install"
 
-  local brew_bin
-  if   [[ -x /opt/homebrew/bin/brew ]]; then brew_bin=/opt/homebrew/bin/brew
-  elif [[ -x /usr/local/bin/brew    ]]; then brew_bin=/usr/local/bin/brew
-  else warn "no brew on disk; skipping"; return
+  if ! command -v yabai >/dev/null 2>&1 \
+     && ! command -v skhd >/dev/null 2>&1 \
+     && ! command -v sketchybar >/dev/null 2>&1; then
+    warn "none of yabai/skhd/sketchybar on PATH; skipping"
+    return
   fi
 
   # (a) Compile sketchybar's bundled C helpers. Idempotent — `make` no-ops
@@ -214,18 +215,24 @@ post_install_window_manager() {
     done
   fi
 
-  # (b) Start launchd agents — idempotent ("already running" still exits 0).
+  # (b) Start launchd agents via each tool's built-in --start-service. Why
+  # not `brew services start`? The asmvik yabai/skhd fork's brew formula
+  # doesn't define a service plist ("Formula yabai has not implemented
+  # #plist or #service"), so brew services start errors out. Each binary
+  # ships its own --start-service / --restart-service subcommands that
+  # write the launchd plist to ~/Library/LaunchAgents/ and load it.
+  # Idempotent — re-loading is a no-op.
   local svc started=()
   for svc in yabai skhd sketchybar; do
     command -v "$svc" >/dev/null 2>&1 || continue
-    if "$brew_bin" services start "$svc" >/dev/null 2>&1; then
+    if "$svc" --start-service >/dev/null 2>&1; then
       started+=("$svc")
     else
-      warn "brew services start $svc failed"
+      warn "$svc --start-service failed"
     fi
   done
   if (( ${#started[@]} )); then
-    ok "brew services started: ${started[*]}"
+    ok "launchd agents started: ${started[*]}"
   fi
 
   # (c) Accessibility consent — required for any input-grabbing tool.
@@ -248,10 +255,10 @@ post_install_window_manager() {
     local svc
     for svc in yabai skhd sketchybar; do
       command -v "$svc" >/dev/null 2>&1 || continue
-      if "$brew_bin" services restart "$svc" >/dev/null 2>&1; then
+      if "$svc" --restart-service >/dev/null 2>&1; then
         ok "$svc restarted"
       else
-        warn "$svc restart failed — try: brew services restart $svc"
+        warn "$svc restart failed — try: $svc --restart-service"
       fi
     done
   else
