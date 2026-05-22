@@ -85,6 +85,14 @@ require_macos() {
 source_nix_profile() {
   # Determinate's installer drops a multi-user profile script; source it so
   # `nix` is on PATH for the rest of this script even on the first install.
+  #
+  # The script self-guards via __ETC_PROFILE_NIX_SOURCED to avoid re-running
+  # in nested shells. macOS Terminal session-restore can preserve that flag
+  # across new tabs even when PATH has been reset by /etc/zprofile's
+  # path_helper — so the guard short-circuits the PATH export and nix
+  # appears "not installed". Clear the guard first; the script is cheap
+  # to re-run.
+  unset __ETC_PROFILE_NIX_SOURCED
   local profile=/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
   # shellcheck source=/dev/null
   [[ -f "$profile" ]] && . "$profile"
