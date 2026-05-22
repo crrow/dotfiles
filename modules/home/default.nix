@@ -9,6 +9,7 @@
     ./mise.nix
     ./fonts.nix
     ./neovim.nix
+    ./window-manager.nix
   ];
 
   home.username      = user;

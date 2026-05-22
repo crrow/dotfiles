@@ -1,0 +1,10 @@
+#!/usr/bin/env lua
+
+local home = os.getenv("HOME")
+package.path = package.path .. ";" .. home .. "/.luarocks/share/lua/5.5/?.lua"
+package.path = package.path .. ";" .. home .. "/.luarocks/share/lua/5.5/?/init.lua"
+package.cpath = package.cpath .. ";" .. home .. "/.luarocks/lib/lua/5.5/?.so"
+
+-- Load the sketchybar-package and prepare the helper binaries
+require("helpers")
+require("init")
