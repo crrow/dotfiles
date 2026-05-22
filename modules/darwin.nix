@@ -80,6 +80,8 @@
       "skhd"                       # hotkey daemon
       "sketchybar"                 # status bar
       "sketchybar-system-stats"    # CPU/mem/network event provider for sketchybar
+      "lua"                        # sketchybar's Lua-based config runtime
+      "luarocks"                   # for lunajson + SbarLua install (post-install)
     ];
     casks = [
       "ghostty"
