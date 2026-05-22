@@ -112,8 +112,13 @@ install_homebrew() {
   # Homebrew's installer also installs the Xcode Command Line Tools, so we
   # don't need a separate `xcode-select --install` GUI dance. It does need
   # sudo — interactive on a real Mac, passwordless in the VM-test setup.
+  #
+  # NONINTERACTIVE=1 skips the installer's confirmation prompts (the
+  # "Press RETURN to continue or any other key to abort" and the implicit
+  # CLT-install opt-in). sudo still prompts on a fresh Mac — that's the
+  # one consent we can't avoid.
   log "Installing Homebrew (needed by nix-darwin's homebrew.casks module)"
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
   source_brew_shellenv
   command -v brew >/dev/null || fail "brew binary missing after install"
   ok "installed"
@@ -183,12 +188,11 @@ fetch_repo() {
 
 # --------------------------------------------------------- window manager ---
 
-# Three things darwin-rebuild can't do on its own for yabai / skhd /
-# sketchybar: (a) compile the per-arch C event-provider binaries the
-# sketchybar config references but doesn't ship; (b) register the launchd
-# agents via `brew services`; (c) grant Accessibility — TCC is
-# SIP-protected, only the user can tick the boxes. We do (a) and (b), then
-# open System Settings for (c).
+# Three things darwin-rebuild can't do on its own for yabai / skhd:
+# (a) compile sketchybar's per-arch C event-provider binaries for the
+# optional bar config; (b) register the launchd agents for yabai / skhd;
+# (c) grant Accessibility — TCC is SIP-protected, only the user can tick
+# the boxes. We do (a) and (b), then open System Settings for (c).
 post_install_window_manager() {
   log "window-manager post-install"
 
@@ -247,9 +251,8 @@ post_install_window_manager() {
   # (b) Start launchd agents. The asmvik yabai/skhd fork's brew formula
   # doesn't define a service plist, so we use each tool's built-in
   # --start-service subcommand (writes ~/Library/LaunchAgents/*.plist
-  # and loads it). FelixKratz's sketchybar formula DOES define a service
-  # plist but the binary has no --start-service flag, so we use
-  # `brew services start` for that one. Both paths idempotent.
+  # and loads it). sketchybar is installed/configured but intentionally
+  # not started on bootstrap, so a fresh VM keeps the native macOS menu bar.
   local svc started=()
   for svc in yabai skhd; do
     command -v "$svc" >/dev/null 2>&1 || continue
@@ -259,15 +262,11 @@ post_install_window_manager() {
       warn "$svc --start-service failed"
     fi
   done
-  if command -v sketchybar >/dev/null 2>&1; then
-    if brew services start sketchybar >/dev/null 2>&1; then
-      started+=(sketchybar)
-    else
-      warn "brew services start sketchybar failed"
-    fi
-  fi
   if (( ${#started[@]} )); then
     ok "launchd agents started: ${started[*]}"
+  fi
+  if command -v sketchybar >/dev/null 2>&1; then
+    dim "sketchybar installed/configured but not started; native menu bar stays active"
   fi
 
   # (c) Accessibility consent — required for any input-grabbing tool.
@@ -278,7 +277,7 @@ post_install_window_manager() {
   command -v yabai >/dev/null 2>&1 || return
   log "Accessibility consent (one-time, manual)"
   dim "  System Settings will open at Privacy & Security → Accessibility."
-  dim "  Tick yabai, skhd, sketchybar; then come back here and press ENTER."
+  dim "  Tick yabai and skhd; then come back here and press ENTER."
   open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" 2>/dev/null || true
 
   if [[ -t 0 ]]; then
@@ -286,7 +285,7 @@ post_install_window_manager() {
     # the keystroke from the user's terminal, not the curl output.
     read -rp "    Press ENTER when ready (or Ctrl-C to skip)... " </dev/tty || return
 
-    log "restarting yabai / skhd / sketchybar to pick up the consent"
+    log "restarting yabai / skhd to pick up the consent"
     local svc
     for svc in yabai skhd; do
       command -v "$svc" >/dev/null 2>&1 || continue
@@ -296,16 +295,9 @@ post_install_window_manager() {
         warn "$svc restart failed — try: $svc --restart-service"
       fi
     done
-    if command -v sketchybar >/dev/null 2>&1; then
-      if brew services restart sketchybar >/dev/null 2>&1; then
-        ok "sketchybar restarted"
-      else
-        warn "sketchybar restart failed — try: brew services restart sketchybar"
-      fi
-    fi
   else
     warn "no tty — grant access manually, then:"
-    dim "    brew services restart yabai skhd sketchybar"
+    dim "    yabai --restart-service && skhd --restart-service"
   fi
 }
 
