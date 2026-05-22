@@ -8,6 +8,7 @@
     ./ghostty.nix
     ./mise.nix
     ./fonts.nix
+    ./neovim.nix
   ];
 
   home.username      = user;

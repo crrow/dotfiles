@@ -3,7 +3,10 @@
 {
   programs.zsh = {
     enable                    = true;
-    autosuggestion.enable     = true;
+    # zsh-autosuggestions disabled — deja replaces it (both wire into the
+    # same POSTDISPLAY widget and would fight). See modules/darwin.nix
+    # homebrew.brews for the deja install.
+    autosuggestion.enable     = false;
     syntaxHighlighting.enable = true;
     enableCompletion          = true;
 
@@ -38,6 +41,9 @@
 
       # Project-local runtimes
       command -v mise >/dev/null && eval "$(mise activate zsh)"
+
+      # Deja — smarter zsh autosuggestions (installed via brew, see darwin.nix)
+      command -v deja >/dev/null && eval "$(deja init zsh)"
 
       # Powerlevel10k user config (committed at repo root, symlinked into $HOME)
       [[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"

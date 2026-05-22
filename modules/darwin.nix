@@ -48,17 +48,26 @@
   };
 
   ###
-  ### Homebrew bridge — for casks (GUI apps) only. CLI tools live in Nix.
+  ### Homebrew bridge — for casks (GUI apps) and the rare tap-only formula.
+  ### CLI tools that exist in nixpkgs go through Home Manager instead.
   ### `cleanup = "uninstall"` removes anything not declared here on every
   ### `darwin-rebuild switch` — strict, declarative, no drift.
   ###
   homebrew = {
     enable = true;
     onActivation = {
-      autoUpdate = false;       # `nix flake update` is the update path
+      autoUpdate = false;       # updates land via `nix flake update`
       upgrade    = true;
       cleanup    = "uninstall";
     };
+    taps = [
+      # Deja: smarter zsh autosuggestions replacement.
+      # https://github.com/Giammarco-Ferranti/deja
+      "giammarco-ferranti/deja"
+    ];
+    brews = [
+      "deja"
+    ];
     casks = [
       "ghostty"
     ];
