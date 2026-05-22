@@ -171,6 +171,64 @@ fetch_repo() {
   ok "fetched"
 }
 
+# --------------------------------------------------------- window manager ---
+
+# Three things darwin-rebuild can't do on its own for yabai / skhd /
+# sketchybar: (a) compile the per-arch C event-provider binaries the
+# sketchybar config references but doesn't ship; (b) register the launchd
+# agents via `brew services`; (c) grant Accessibility — TCC is
+# SIP-protected, only the user can tick the boxes. We do (a) and (b), then
+# open System Settings for (c).
+post_install_window_manager() {
+  log "window-manager post-install"
+
+  local brew_bin
+  if   [[ -x /opt/homebrew/bin/brew ]]; then brew_bin=/opt/homebrew/bin/brew
+  elif [[ -x /usr/local/bin/brew    ]]; then brew_bin=/usr/local/bin/brew
+  else warn "no brew on disk; skipping"; return
+  fi
+
+  # (a) Compile sketchybar's bundled C helpers. Idempotent — `make` no-ops
+  # if outputs are up to date.
+  local helpers="$HOME/.config/sketchybar/helpers/event_providers"
+  if [[ -d "$helpers" ]]; then
+    local d
+    for d in "$helpers"/*/; do
+      [[ -f "$d/makefile" || -f "$d/Makefile" ]] || continue
+      log "make $(basename "$d")"
+      if (cd "$d" && make >/dev/null 2>&1); then
+        ok "built"
+      else
+        warn "make failed in $d (non-fatal — you'll need to build manually)"
+      fi
+    done
+  fi
+
+  # (b) Start launchd agents — idempotent ("already running" still exits 0).
+  local svc started=()
+  for svc in yabai skhd sketchybar; do
+    command -v "$svc" >/dev/null 2>&1 || continue
+    if "$brew_bin" services start "$svc" >/dev/null 2>&1; then
+      started+=("$svc")
+    else
+      warn "brew services start $svc failed"
+    fi
+  done
+  if (( ${#started[@]} )); then
+    ok "brew services started: ${started[*]}"
+  fi
+
+  # (c) Accessibility consent — required for any input-grabbing tool.
+  # Can't be granted from a script (SIP). Open the right pane and prompt.
+  if command -v yabai >/dev/null 2>&1; then
+    log "Accessibility consent (one-time, manual)"
+    dim "  System Settings → Privacy & Security → Accessibility"
+    dim "  Tick yabai, skhd, sketchybar — then:"
+    dim "    brew services restart yabai skhd sketchybar"
+    open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" 2>/dev/null || true
+  fi
+}
+
 # ------------------------------------------------------------------ switch ---
 
 darwin_rebuild_switch() {
@@ -202,6 +260,7 @@ main() {
   source_nix_profile
   fetch_repo
   darwin_rebuild_switch
+  post_install_window_manager
   log "done"
   dim "open a new shell to pick up your new \$SHELL/\$PATH"
 }
