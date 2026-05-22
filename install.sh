@@ -114,6 +114,12 @@ install_homebrew() {
 
 install_nix() {
   log "Nix"
+  # Determinate Nix's /etc/zshenv only puts nix on PATH for SSH sessions
+  # (SHLVL=1, SSH_CONNECTION set). A Terminal.app-spawned login shell
+  # misses it, so `command -v nix` would falsely report missing here.
+  # Source the profile script unconditionally first — it's a no-op when
+  # nix isn't installed yet.
+  source_nix_profile
   if command -v nix >/dev/null 2>&1; then
     ok "already installed ($(nix --version 2>/dev/null || echo unknown))"
     return
