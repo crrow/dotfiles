@@ -84,3 +84,44 @@ vm-down:
 # List all lume VMs.
 vm-ls:
     lume ls
+
+# ─── lint / format ─────────────────────────────────────────────────────────
+# Toolchain (shellcheck / shfmt / nixfmt) is pinned in mise.toml. Bootstrap
+# on a fresh checkout with `mise install`; mise auto-activates here and puts
+# them on PATH. No nix required.
+
+# Write: format all .sh + .nix files in place. Run before committing.
+fmt: fmt-sh fmt-nix
+
+# Read-only: fails non-zero on any formatting drift or lint finding. CI/pre-commit.
+lint: lint-sh lint-nix
+    @echo "lint: ok"
+
+fmt-sh:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    files=$(git ls-files '*.sh')
+    [ -n "$files" ] || { echo "fmt-sh: no .sh files"; exit 0; }
+    shfmt -w -i 2 -ci $files
+
+fmt-nix:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    files=$(git ls-files '*.nix')
+    [ -n "$files" ] || { echo "fmt-nix: no .nix files"; exit 0; }
+    nixfmt $files
+
+lint-sh:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    files=$(git ls-files '*.sh')
+    [ -n "$files" ] || { echo "lint-sh: no .sh files"; exit 0; }
+    shfmt -d -i 2 -ci $files
+    shellcheck $files
+
+lint-nix:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    files=$(git ls-files '*.nix')
+    [ -n "$files" ] || { echo "lint-nix: no .nix files"; exit 0; }
+    nixfmt --check $files

@@ -1,0 +1,10 @@
+# Project-local mise config — pins the lint/format toolchain for this repo.
+# These are dev-time tools (called from Justfile), not part of the daily
+# Mac environment. mise auto-activates when you `cd` here and puts them
+# on PATH; CI can `mise install && mise exec -- just lint`.
+#
+# Bootstrap on a fresh checkout: `mise install`
+[tools]
+shellcheck      = "latest"
+shfmt           = "latest"
+"ubi:NixOS/nixfmt" = { version = "latest", exe = "nixfmt", matching = "nixfmt-static" }

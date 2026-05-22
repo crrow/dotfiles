@@ -3,3 +3,6 @@ result
 result-*
 # per-machine login name written by install.sh; flake.nix reads it.
 /.user
+# parallel-agent git worktrees; see CLAUDE.md "Parallel work via worktrees".
+/.worktrees/
+nvim/lazy-lock.json
