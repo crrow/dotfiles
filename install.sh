@@ -106,6 +106,7 @@ install_homebrew() {
      || [[ -x /opt/homebrew/bin/brew ]] \
      || [[ -x /usr/local/bin/brew ]]; then
     ok "already installed"
+    source_brew_shellenv  # idempotent — guarantees brew on PATH for later steps
     return
   fi
   # Homebrew's installer also installs the Xcode Command Line Tools, so we
@@ -113,11 +114,20 @@ install_homebrew() {
   # sudo — interactive on a real Mac, passwordless in the VM-test setup.
   log "Installing Homebrew (needed by nix-darwin's homebrew.casks module)"
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+  source_brew_shellenv
+  command -v brew >/dev/null || fail "brew binary missing after install"
+  ok "installed"
+}
+
+source_brew_shellenv() {
+  # `brew shellenv` adds /opt/homebrew/bin (Apple Silicon) or
+  # /usr/local/bin (Intel) to PATH, plus MANPATH / INFOPATH. Idempotent —
+  # re-sourcing is a no-op. Needed so later steps (post_install_window_manager,
+  # any 'command -v yabai' checks) actually see brew-installed binaries even
+  # on a re-run where install_homebrew took the early-return path.
   if   [[ -x /opt/homebrew/bin/brew ]]; then eval "$(/opt/homebrew/bin/brew shellenv)"
   elif [[ -x /usr/local/bin/brew    ]]; then eval "$(/usr/local/bin/brew shellenv)"
-  else fail "brew binary missing after install"
   fi
-  ok "installed"
 }
 
 install_nix() {
