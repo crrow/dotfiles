@@ -145,6 +145,7 @@ install_nix() {
   source_nix_profile
   if command -v nix >/dev/null 2>&1; then
     ok "already installed ($(nix --version 2>/dev/null || echo unknown))"
+    propagate_proxy_to_nix_daemon
     return
   fi
 
@@ -154,7 +155,40 @@ install_nix() {
 
   source_nix_profile
   command -v nix >/dev/null || fail "nix still not on PATH after install"
+  propagate_proxy_to_nix_daemon
   ok "installed"
+}
+
+# If the user shell has HTTPS_PROXY set (corporate proxy, VM-test, …), the
+# Determinate Nix daemon — running as root under launchd — doesn't inherit
+# it. nix-daemon's libcurl then can't reach github.com, so flake fetches
+# stall. Inject the proxy vars into the daemon's launchd plist and reload.
+# No-op when no proxy is configured (the common case on a real Mac).
+propagate_proxy_to_nix_daemon() {
+  [[ -z "${HTTPS_PROXY:-${https_proxy:-}}" ]] && return
+
+  local plist=/Library/LaunchDaemons/systems.determinate.nix-daemon.plist
+  [[ -f "$plist" ]] || return
+
+  log "propagating HTTPS_PROXY into nix-daemon launchd plist"
+  sudo /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables dict" "$plist" 2>/dev/null || true
+  local k v
+  for k in HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; do
+    v="${!k:-}"
+    [[ -z "$v" ]] && continue
+    sudo /usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:$k" "$plist" 2>/dev/null || true
+    sudo /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:$k string $v" "$plist"
+  done
+  # `launchctl kickstart -k` doesn't pick up plist env changes; need full
+  # unload/load. The bootout often leaves the daemon respawned (KeepAlive),
+  # so we also kill any stragglers by pid.
+  sudo launchctl bootout system "$plist" 2>/dev/null || true
+  sleep 1
+  sudo pkill -9 -f "nix-daemon" 2>/dev/null || true
+  sleep 1
+  sudo launchctl bootstrap system "$plist"
+  sleep 3
+  ok "nix-daemon proxy configured"
 }
 
 # -------------------------------------------------------------------- repo ---
