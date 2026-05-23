@@ -96,6 +96,10 @@ launchctl_proxy() {
     v="${!k:-}"
     [[ -n "$v" ]] && launchctl setenv "$k" "$v"
   done
+  # The last for-iteration may end on `[[ -n "" ]]` (returns 1) for an
+  # unset NO_PROXY — without explicit return, `set -e` kills the script
+  # here, before install_nix even runs.
+  return 0
 }
 
 # Xcode Command Line Tools — required by brew to source-build any
