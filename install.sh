@@ -154,13 +154,23 @@ install_xcode_clt() {
 # never trip the function (HTTPS_PROXY guard).
 system_proxy_config() {
   [[ -z "${HTTPS_PROXY:-}" ]] && return 0
-  log "system proxy config: /etc/gitconfig + /etc/curlrc"
+  log "system proxy config: /etc/gitconfig + /etc/curlrc + sudoers"
   if command -v /usr/bin/git >/dev/null; then
     sudo /usr/bin/git config --system http.proxy "$HTTPS_PROXY"
     sudo /usr/bin/git config --system https.proxy "$HTTPS_PROXY"
   fi
   # /etc/curlrc — one option per line, `--proxy <url>` form.
   printf 'proxy = "%s"\n' "$HTTPS_PROXY" | sudo /usr/bin/tee /etc/curlrc >/dev/null
+  # sudoers env_keep — also declared in modules/darwin/proxy.nix, but
+  # nix-darwin's preActivation hook runs AFTER the homebrew phase
+  # (writes the file at the end of the activate script). On first
+  # switch that means brew bundle runs without our env_keep in place
+  # and its inner `sudo --user=lume` strips HTTPS_PROXY. Install the
+  # drop-in eagerly here so brew bundle picks it up immediately.
+  printf '%s\n' \
+    'Defaults env_keep += "HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY no_proxy"' \
+    | sudo /usr/bin/tee /etc/sudoers.d/dotfiles-proxy >/dev/null
+  sudo /bin/chmod 440 /etc/sudoers.d/dotfiles-proxy
 }
 
 # Determinate Nix's daemon plist is root-owned, launchd-managed, and
