@@ -139,21 +139,28 @@ install_xcode_clt() {
   sudo rm -f "$placeholder"
 }
 
-# `git config --system http.proxy` writes /etc/gitconfig. Why we need it:
+# Write proxy into /etc/gitconfig and /etc/curlrc — the two
+# config files git and curl read regardless of env. Why we need this:
 # nix-darwin's activate invokes brew bundle via
 #   `sudo --preserve-env=PATH --user=lume env HOMEBREW_NO_AUTO_UPDATE=1 brew bundle …`
 # The `--preserve-env=PATH` whitelist overrides sudoers env_keep — only
 # PATH survives. There's no `-i` either, so /etc/zshenv.local isn't
-# read. Net: brew bundle's git clone has no HTTPS_PROXY. By writing
-# the proxy directly into git's system config we bypass env entirely.
-# (Side effect: every git op on the machine uses this proxy. Acceptable
-# for our use case — matches the rest of the proxy.env contract.)
-git_proxy_config() {
+# read. Net: brew bundle's git clone (used for `brew tap`) and curl
+# (used for formula source downloads) have no HTTPS_PROXY. Writing
+# the proxy directly into git's and curl's static configs bypasses
+# env entirely.
+# Side effect: every git/curl op on the box uses this proxy. Acceptable
+# for the same reason as proxy.env's reach: machines without a proxy
+# never trip the function (HTTPS_PROXY guard).
+system_proxy_config() {
   [[ -z "${HTTPS_PROXY:-}" ]] && return 0
-  command -v /usr/bin/git >/dev/null || return 0
-  log "git system config: http.proxy"
-  sudo /usr/bin/git config --system http.proxy "$HTTPS_PROXY"
-  sudo /usr/bin/git config --system https.proxy "$HTTPS_PROXY"
+  log "system proxy config: /etc/gitconfig + /etc/curlrc"
+  if command -v /usr/bin/git >/dev/null; then
+    sudo /usr/bin/git config --system http.proxy "$HTTPS_PROXY"
+    sudo /usr/bin/git config --system https.proxy "$HTTPS_PROXY"
+  fi
+  # /etc/curlrc — one option per line, `--proxy <url>` form.
+  printf 'proxy = "%s"\n' "$HTTPS_PROXY" | sudo /usr/bin/tee /etc/curlrc >/dev/null
 }
 
 # Determinate Nix's daemon plist is root-owned, launchd-managed, and
@@ -254,7 +261,7 @@ main() {
   install_nix
   nix_daemon_proxy
   install_xcode_clt
-  git_proxy_config
+  system_proxy_config
   fetch_repo
   darwin_switch
   grant_accessibility
