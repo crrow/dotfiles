@@ -89,9 +89,21 @@ _vm-prep:
 # by _vm-prep). `|| true`: osascript holds the SSH session open until
 # Terminal finishes rendering, past lume ssh's timeout — script still starts.
 # Auto-called by vm-up; invoke directly to re-run install.sh in a live VM.
+#
+# Override the branch with DOTFILES_REF, e.g. testing a feature branch:
+#   DOTFILES_REF=refactor just vm-bootstrap
+# Both the install.sh URL and the env var fed into the bash invocation
+# get the same ref, so install.sh's fetch_repo pulls the same tarball.
 vm-bootstrap:
-    @lume ssh {{vm}} --timeout 30 -- 'open -a Terminal && sleep 2 && osascript -e '"'"'tell application "Terminal" to do script "/bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/crrow/dotfiles/main/install.sh)\""'"'" || true
-    @echo "install.sh launched in VM Terminal — watch via VNC; press Enter at the Accessibility prompt."
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ref="${DOTFILES_REF:-main}"
+    url="https://raw.githubusercontent.com/crrow/dotfiles/${ref}/install.sh"
+    cmd="DOTFILES_REF=${ref} /bin/bash -c \\\"\$(curl -fsSL ${url})\\\""
+    lume ssh {{vm}} --timeout 30 -- \
+      "open -a Terminal && sleep 2 && osascript -e 'tell application \"Terminal\" to do script \"${cmd}\"'" \
+      || true
+    echo "install.sh launched in VM Terminal (ref=${ref}) — watch via VNC; press Enter at the Accessibility prompt."
 
 # Open an interactive SSH session into the running VM (creds: lume / lume).
 vm-ssh:
