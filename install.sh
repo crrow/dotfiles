@@ -95,7 +95,13 @@ source_nix_profile() {
   unset __ETC_PROFILE_NIX_SOURCED
   local profile=/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
   # shellcheck source=/dev/null
-  [[ -f "$profile" ]] && . "$profile"
+  if [[ -f "$profile" ]]; then
+    . "$profile"
+  fi
+  # Always return 0 — on a fresh machine Nix isn't installed yet and the
+  # missing-file check ([[ -f ]] && . …) would propagate 1 through set -e
+  # and kill install.sh right after the "==> Nix" log line.
+  return 0
 }
 
 # --------------------------------------------------------------------- nix ---
