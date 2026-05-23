@@ -79,6 +79,59 @@ EOF
   log "proxy: $p"
 }
 
+# nix-darwin's activation runs `sudo -u $USER -i brew bundle …`. The -i
+# (login shell) discards $HTTPS_PROXY exported in this script — and the
+# sudoers env_keep can't help because -i resets env wholesale. Plant
+# the vars in the user's launchd session so login shells pick them up
+# via the launchd-injected environment. No-op when no proxy.
+#
+# HM also runs the equivalent (modules/home/proxy.nix) on every switch,
+# but that activation only fires AFTER system activation completes,
+# which is too late for the first switch's brew bundle.
+launchctl_proxy() {
+  [[ -z "${HTTPS_PROXY:-}" ]] && return 0
+  log "launchctl setenv (user session) proxy vars"
+  local k v
+  for k in HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; do
+    v="${!k:-}"
+    [[ -n "$v" ]] && launchctl setenv "$k" "$v"
+  done
+}
+
+# Xcode Command Line Tools — required by brew to source-build any
+# formula without a prebuilt bottle (yabai, skhd, lua, ghostty, …).
+# nix-homebrew installs brew but NOT the CLT, so we install it here
+# before darwin-rebuild kicks off `brew bundle`.
+#
+# Trick: touching the "in-progress" placeholder makes `softwareupdate -l`
+# list the CLT as an available update, which we can then install
+# non-interactively. Without the placeholder, the only way to install is
+# `xcode-select --install`, which pops a GUI dialog — fine on a real
+# Mac, but blocks VM tests.
+install_xcode_clt() {
+  if [[ -d /Library/Developer/CommandLineTools ]] &&
+    /usr/bin/xcode-select -p >/dev/null 2>&1; then
+    return 0
+  fi
+  log "Xcode Command Line Tools"
+  local placeholder=/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+  sudo touch "$placeholder"
+  local label
+  label=$(softwareupdate -l 2>/dev/null |
+    grep -E '^\s*\*.*Command Line Tools' |
+    sort -V | tail -1 |
+    sed -E 's/^\s*\*\s*(Label:\s*)?//')
+  if [[ -n "$label" ]]; then
+    sudo softwareupdate -i "$label" --verbose
+  else
+    # Fallback: GUI installer. Works on real Macs with a user present.
+    xcode-select --install 2>/dev/null || true
+    printf '   waiting for CLT install (manual)…\n'
+    until /usr/bin/xcode-select -p >/dev/null 2>&1; do sleep 10; done
+  fi
+  sudo rm -f "$placeholder"
+}
+
 # Determinate Nix's daemon plist is root-owned, launchd-managed, and
 # NOT under nix-darwin's control. So this injection has to live in
 # shell, not Nix. No-op when no proxy.
@@ -173,8 +226,10 @@ grant_accessibility() {
 main() {
   acquire_lock
   persist_proxy
+  launchctl_proxy
   install_nix
   nix_daemon_proxy
+  install_xcode_clt
   fetch_repo
   darwin_switch
   grant_accessibility
