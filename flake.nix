@@ -18,10 +18,10 @@
     # binary itself. With it, `homebrew.enable = true` in nix-darwin no
     # longer depends on a system-installed brew — install.sh stops
     # needing the curl|sh Homebrew installer entirely.
-    nix-homebrew = {
-      url = "github:zhaofengli/nix-homebrew";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    #
+    # No nixpkgs.follows: nix-homebrew does not declare a nixpkgs input
+    # of its own; following a non-existent input is a warning.
+    nix-homebrew.url = "github:zhaofengli/nix-homebrew";
   };
 
   outputs = { self, nixpkgs, nix-darwin, home-manager, nix-homebrew, ... }@inputs:
