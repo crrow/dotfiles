@@ -236,12 +236,22 @@ fetch_repo() {
 # nix-darwin ≥ 25.x requires darwin-rebuild to run as root. sudo's
 # secure_path strips /nix/... so we hand the absolute path; --flake
 # gets an absolute path because sudo's cwd is unreliable.
+#
+# Runs twice: brew bundle's first pass can flake on parallel source
+# downloads through a proxy (transient `Broken pipe` / DNS errors),
+# leaving 1-3 formulae uninstalled. darwin-rebuild itself still exits
+# 0 in that case (brew bundle failures aren't fatal to activation), so
+# the second switch picks up the stragglers idempotently. No-op past
+# the first run on the real Mac.
 darwin_switch() {
   printf '%s\n' "$USER" >"$DOTFILES_DIR/.user"
-  log "darwin-rebuild switch --flake $DOTFILES_DIR"
-  sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
-    "$NIX_BIN" "${NIX_FLAGS[@]}" \
-    run nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
+  local i
+  for i in 1 2; do
+    log "darwin-rebuild switch --flake $DOTFILES_DIR (attempt $i/2)"
+    sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
+      "$NIX_BIN" "${NIX_FLAGS[@]}" \
+      run nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
+  done
 }
 
 # The HM activation already started yabai/skhd launchd agents, but TCC
