@@ -16,10 +16,6 @@
       push.autoSetupRemote = true;
     };
 
-    # HM warns when this is left at the legacy default. Off explicitly;
-    # flip to true to have git stash credentials in the macOS Keychain.
-    enableGitCredentialOSXKeychain = false;
-
     ignores = [
       ".DS_Store"
       ".idea"
