@@ -229,7 +229,7 @@ Each cost a re-roll of the VM.
 - **`nix.enable = false` is required with Determinate Nix.**
   nix-darwin defaults to managing its own nix daemon. With Determinate
   also installed, activation aborts: "Determinate detected … set
-  `nix.enable = false;`". Add it to `modules/darwin.nix`. You lose the
+  `nix.enable = false;`". Add it to `modules/darwin/system.nix`. You lose the
   declarative `nix.*` settings (substituters etc), but Determinate's
   installer already wires those up.
 

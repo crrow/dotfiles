@@ -13,9 +13,18 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Declarative Homebrew: nix-homebrew installs and owns the brew
+    # binary itself. With it, `homebrew.enable = true` in nix-darwin no
+    # longer depends on a system-installed brew — install.sh stops
+    # needing the curl|sh Homebrew installer entirely.
+    nix-homebrew = {
+      url = "github:zhaofengli/nix-homebrew";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, nix-darwin, home-manager, ... }:
+  outputs = { self, nixpkgs, nix-darwin, home-manager, nix-homebrew, ... }@inputs:
     let
       system = "aarch64-darwin";
 
@@ -31,11 +40,15 @@
              then builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile ./.user)
              else "crrow";
 
-      mkDarwin = nix-darwin.lib.darwinSystem {
+      # mkDarwin :: path -> darwinSystem
+      # Each host under ./hosts/<name>/default.nix gets wrapped through
+      # this; the host file imports modules/darwin and adds whatever
+      # host-specific overrides it needs.
+      mkDarwin = hostPath: nix-darwin.lib.darwinSystem {
         inherit system;
-        specialArgs = { inherit user; };
+        specialArgs = { inherit user inputs; };
         modules = [
-          ./modules/darwin.nix
+          hostPath
 
           home-manager.darwinModules.home-manager
           {
@@ -55,21 +68,22 @@
         ];
       };
 
-      # darwin-rebuild auto-resolves to darwinConfigurations.$hostname.
-      # Expose the same config under every hostname we want this flake to
-      # drive; add yours here when you set up a new machine.
-      hostnames = [
-        "default"                # explicit `--flake .#default`
-        "lumes-Virtual-Machine"  # lume's vanilla macOS VM (testing)
-      ];
+      # Auto-discover every subdir under ./hosts as a darwinConfigurations
+      # entry. Adding a new machine = `mkdir hosts/<hostname> && touch
+      # hosts/<hostname>/default.nix` — no flake edit needed.
+      hostsDir = ./hosts;
+      hosts = builtins.attrNames (
+        nixpkgs.lib.filterAttrs (_: type: type == "directory")
+          (builtins.readDir hostsDir)
+      );
+
       pkgs = nixpkgs.legacyPackages.${system};
     in {
-      darwinConfigurations = nixpkgs.lib.genAttrs hostnames (_: mkDarwin);
+      darwinConfigurations = nixpkgs.lib.genAttrs hosts
+        (name: mkDarwin (hostsDir + "/${name}"));
 
       # `nix fmt` formats the flake with nixfmt — the RFC 166 community
-      # standard. Older Nix code (and this flake's earlier revisions) used
-      # nixpkgs-fmt; nixfmt-rfc-style is the canonical successor and the
-      # one nix.dev recommends.
+      # standard.
       formatter.${system} = pkgs.nixfmt-rfc-style;
 
       # `nix develop` drops you into a shell with the tools needed to

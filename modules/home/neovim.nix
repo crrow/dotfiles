@@ -6,6 +6,9 @@
     viAlias    = true;
     vimAlias   = true;
     vimdiffAlias = true;
+    # HM nags when this is left at the legacy default. We don't run
+    # python-based plugins from inside nvim, so off.
+    withPython3 = false;
   };
 
   # nvim config is symlinked file-by-file (recursive = true) so the parent

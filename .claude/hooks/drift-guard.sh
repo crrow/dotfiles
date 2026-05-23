@@ -31,18 +31,18 @@ block() {
 
 case "$COMMAND" in
   # `brew install / uninstall` outside the flake. The bridge in
-  # `modules/darwin.nix` is the only authorised brew caller.
+  # `modules/darwin/homebrew.nix` is the only authorised brew caller.
   *"brew install"*|*"brew uninstall"*|*"brew tap"*|*"brew untap"*)
     block "manual brew mutation: $COMMAND" \
-          "homebrew is managed by nix-darwin (modules/darwin.nix homebrew.casks)." \
-          "edit modules/darwin.nix and run 'darwin-rebuild switch --flake .'"
+          "homebrew is managed by nix-darwin (modules/darwin/homebrew.nix)." \
+          "edit modules/darwin/homebrew.nix and run 'darwin-rebuild switch --flake .'"
     ;;
 
   # `defaults write` for macOS system prefs — must go through
-  # system.defaults in modules/darwin.nix.
+  # system.defaults in modules/darwin/system.nix.
   *"defaults write "*)
     block "manual defaults write: $COMMAND" \
-          "macOS defaults are declared in modules/darwin.nix (system.defaults)." \
+          "macOS defaults are declared in modules/darwin/system.nix (system.defaults)." \
           "find the matching nix-darwin attribute and add it there"
     ;;
 
@@ -51,7 +51,7 @@ case "$COMMAND" in
   *"chsh "*)
     block "manual chsh: $COMMAND" \
           "login shell is declared by nix-darwin." \
-          "set users.users.<you>.shell in modules/darwin.nix if it isn't already"
+          "set users.users.<you>.shell in modules/darwin/system.nix if it isn't already"
     ;;
 
   # nix-env imperative installs — these go into the user profile and

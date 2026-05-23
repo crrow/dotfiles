@@ -33,9 +33,14 @@ non-negotiables:
 
 Align proposals to these, not to me:
 
-- `flake.nix` — inputs (nixpkgs / nix-darwin / home-manager) + the
-  `darwinConfigurations.default` output
-- `modules/darwin.nix` — system state: macOS defaults, Homebrew casks
+- `flake.nix` — inputs (nixpkgs / nix-darwin / home-manager) + a
+  `mkDarwin` helper that auto-discovers every dir under `hosts/` and
+  exposes it as `darwinConfigurations.<hostname>`
+- `hosts/<hostname>/default.nix` — per-machine entry; imports
+  `modules/darwin` and overrides anything host-specific
+- `modules/darwin/` — system state, one file per concern (system
+  defaults + nix daemon → `system.nix`; brew taps/brews/casks →
+  `homebrew.nix`); `default.nix` is the entry that imports them
 - `modules/home/` — user state, one file per concern (zsh, git, starship,
   zellij, ghostty, mise); `default.nix` is the entry that imports them
 - `install.sh` — minimal bootstrap (Determinate Nix → clone → switch),

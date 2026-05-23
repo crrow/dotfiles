@@ -10,13 +10,17 @@ declared state. Re-running `darwin-rebuild switch` is always safe.
 
 ## What's inside
 
-- **System** (`modules/darwin.nix`): macOS defaults (Dock, Finder, key repeat,
-  …), Homebrew bridge for casks (Ghostty)
-- **User** (`modules/home.nix`): zsh + oh-my-zsh + [starship](https://starship.rs),
+- **Hosts** (`hosts/<hostname>/default.nix`): per-machine entry; the
+  flake auto-discovers every subdirectory and exposes it as
+  `darwinConfigurations.<hostname>`
+- **System** (`modules/darwin/`): nix daemon + macOS defaults
+  (Dock, Finder, key repeat, …) → `system.nix`; Homebrew bridge for
+  casks (Ghostty) and brews → `homebrew.nix`
+- **User** (`modules/home/`): zsh + oh-my-zsh + powerlevel10k,
   [zellij](https://zellij.dev), [mise](https://mise.jdx.dev), git (with delta),
-  fzf, bat, eza, fd, ripgrep
+  fzf, bat, eza, fd, ripgrep — one file per concern
 - **Terminal**: [Ghostty](https://ghostty.org) (cask) with config in
-  `modules/home.nix`
+  `modules/home/ghostty.nix`
 
 ## Bootstrap on a new macOS
 

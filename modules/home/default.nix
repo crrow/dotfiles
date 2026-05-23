@@ -10,6 +10,7 @@
     ./fonts.nix
     ./neovim.nix
     ./window-manager.nix
+    ./proxy.nix
   ];
 
   home.username      = user;

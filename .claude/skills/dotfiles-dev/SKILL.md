@@ -57,7 +57,7 @@ them share the same checkout. Rules, enforced by
 
 1. Find the `defaults write` key — `defaults read NSGlobalDomain` lists
    them, or grep the nix-darwin source.
-2. Add the attribute to `system.defaults` in `modules/darwin.nix`.
+2. Add the attribute to `system.defaults` in `modules/darwin/system.nix`.
 3. `darwin-rebuild switch --flake .` (on main).
 
 Do not run `defaults write` by hand — `drift-guard.sh` blocks it, and

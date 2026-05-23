@@ -4,8 +4,8 @@
   programs.zsh = {
     enable                    = true;
     # zsh-autosuggestions disabled — deja replaces it (both wire into the
-    # same POSTDISPLAY widget and would fight). See modules/darwin.nix
-    # homebrew.brews for the deja install.
+    # same POSTDISPLAY widget and would fight). See
+    # modules/darwin/homebrew.nix for the deja install.
     autosuggestion.enable     = false;
     syntaxHighlighting.enable = true;
     enableCompletion          = true;
@@ -32,6 +32,15 @@
       g  = "git";
       zj = "zellij";
     };
+
+    # Sourced by every zsh invocation (interactive, non-interactive,
+    # login). Belongs in .zshenv — not .zshrc — so `sudo -u user -i`
+    # during nix-darwin's brew bundle activation also picks it up.
+    # The file is machine-local, written by install.sh on first proxy
+    # detection; absent on machines without a proxy.
+    envExtra = ''
+      [ -f "$HOME/.config/dotfiles/proxy.env" ] && . "$HOME/.config/dotfiles/proxy.env"
+    '';
 
     initContent = ''
       # Enable Powerlevel10k instant prompt. Keep this near the top of .zshrc.

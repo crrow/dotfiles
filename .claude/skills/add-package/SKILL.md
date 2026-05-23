@@ -11,8 +11,8 @@ description: |
   step if anything fails, leaving the working tree clean.
 
   Do NOT use for system defaults (Dock, Finder, key repeat) — those go
-  through `system.defaults` in `modules/darwin.nix`, not the package
-  pipeline.
+  through `system.defaults` in `modules/darwin/system.nix`, not the
+  package pipeline.
 ---
 
 # Add a package
@@ -23,7 +23,7 @@ Three surfaces, decided by what the user is installing:
 | ------------------------ | ---------------------------------------- | --------------------------------- |
 | CLI binary, no config    | `home.packages` in HM                    | `modules/home/default.nix`        |
 | CLI/TUI with config      | `programs.X` HM module                   | `modules/home/<name>.nix` (new)   |
-| GUI app (signed, /Apps)  | Homebrew cask                            | `modules/darwin.nix` (`casks`)    |
+| GUI app (signed, /Apps)  | Homebrew cask                            | `modules/darwin/homebrew.nix` (`casks`) |
 
 When in doubt, **prefer the Home Manager `programs.X` module** over
 plain `home.packages` — it integrates config and shell completions.
@@ -81,7 +81,7 @@ imports = [
 **GUI cask** — add to `homebrew.casks`:
 
 ```nix
-# modules/darwin.nix
+# modules/darwin/homebrew.nix
 homebrew.casks = [
   "ghostty"
   "obsidian"   # ← new
