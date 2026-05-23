@@ -120,11 +120,14 @@ install_xcode_clt() {
   log "Xcode Command Line Tools"
   local placeholder=/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
   sudo touch "$placeholder"
+  # macOS BSD sed/grep don't grok \s; use POSIX [[:space:]] classes.
+  # `softwareupdate -l` output: ` * Label: Command Line Tools for Xcode-XX.X`.
+  # awk picks the line and strips the `* Label: ` prefix to leave just the
+  # label that `-i` accepts.
   local label
-  label=$(softwareupdate -l 2>/dev/null |
-    grep -E '^\s*\*.*Command Line Tools' |
-    sort -V | tail -1 |
-    sed -E 's/^\s*\*\s*(Label:\s*)?//')
+  label=$(softwareupdate -l 2>/dev/null \
+    | awk -F'Label:[[:space:]]*' '/^[[:space:]]*\*.*Command Line Tools/ {print $2}' \
+    | sort -V | tail -1)
   if [[ -n "$label" ]]; then
     sudo softwareupdate -i "$label" --verbose
   else
