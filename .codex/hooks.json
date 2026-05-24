@@ -6,11 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./.codex/hooks/drift-guard.sh"
+            "command": "./.claude/hooks/drift-guard.sh"
           },
           {
             "type": "command",
-            "command": "./.codex/hooks/worktree-guard.sh"
+            "command": "./.claude/hooks/worktree-guard.sh"
           }
         ]
       }
