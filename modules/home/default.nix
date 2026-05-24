@@ -10,7 +10,8 @@
     ./fonts.nix
     ./neovim.nix
     ./vscode.nix
-    ./wallpaper.nix
+    ./zed.nix
+    # ./wallpaper.nix   # disabled while wallpapers flake input is unavailable
     ./window-manager.nix
     ./proxy.nix
   ];

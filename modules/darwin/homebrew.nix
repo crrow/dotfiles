@@ -56,6 +56,7 @@
     ];
     casks = [
       "ghostty"
+      "zed"
     ];
   };
 }
