@@ -30,17 +30,30 @@ One line, from a fresh user shell:
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/crrow/dotfiles/main/install.sh)"
 ```
 
-What happens:
+What `install.sh` does (intentionally minimal — ~100 lines):
 
-1. `install.sh` installs [Determinate Nix](https://determinate.systems/nix) if
-   `nix` isn't already on PATH.
-2. Clones this repo to `~/code/personal/dotfiles` (uses `nix run nixpkgs#git`
-   so no Xcode CLT detour is needed).
-3. Runs `darwin-rebuild switch --flake .` — Nix builds the entire system
-   profile (CLI tools, Home Manager links, Homebrew casks) and activates it.
+1. Persists `$HTTPS_PROXY` (if set) to `~/.config/dotfiles/proxy.env` —
+   the single source of truth every Nix module reads from.
+2. Installs [Determinate Nix](https://determinate.systems/nix) if `nix`
+   isn't already on PATH.
+3. Fetches the repo to `~/code/personal/dotfiles` (tarball — no git
+   dependency yet).
+4. Hands off: `sudo nix run nix-darwin#darwin-rebuild -- switch --flake path:…`
 
-Open a new shell when it's done. The login shell is now Nix-managed zsh with
-mise + starship + OMZ wired up.
+Everything else is declarative under `modules/darwin/`:
+
+- `proxy.nix` — writes `/etc/{sudoers.d/dotfiles-proxy,gitconfig,curlrc,zshenv.local}` from `proxy.env`
+- `xcode-clt.nix` — installs Command Line Tools non-interactively via `softwareupdate`
+- `nix-daemon-proxy.nix` — injects proxy into Determinate's launchd plist + restarts the daemon
+- `homebrew.nix` — declarative brew taps/brews/casks via `nix-homebrew`
+- `system.nix` — macOS defaults, primary user, nix daemon
+
+Open a new shell when it's done.
+
+One manual step the OS won't let any installer automate:
+**grant yabai + skhd Accessibility consent**
+(System Settings → Privacy & Security → Accessibility — TCC is SIP-protected).
+Then run `just postinstall` to restart the services.
 
 Env knobs: `DOTFILES_DIR` (default `~/code/personal/dotfiles`),
 `DOTFILES_REF` (default `main`).

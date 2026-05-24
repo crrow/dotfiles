@@ -1,26 +1,18 @@
 #!/usr/bin/env bash
 #
-# crrow/dotfiles — one-shot bootstrap (Nix-based).
+# crrow/dotfiles — one-shot bootstrap. Install Nix, fetch the repo,
+# hand off to nix-darwin. Everything else is Nix's job.
 #
 #   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/crrow/dotfiles/main/install.sh)"
 #
-# Idempotent: each step skips if already done. Re-run is safe.
-#
-# What stays here vs Nix:
-#   * Lock + proxy.env persistence + Determinate install + tarball fetch
-#     + Determinate's nix-daemon plist proxy injection + `darwin-rebuild
-#     switch` + interactive Accessibility consent.
-#   * Everything else (sudoers env_keep, user-launchd setenv, sketchybar
-#     compile, SbarLua, yabai/skhd service start) lives in
-#     modules/{darwin,home}/ — declarative, runs on every switch.
+# Idempotent: re-runs are no-ops past the first.
 #
 # Env knobs:
-#   DOTFILES_DIR   target checkout path  (default: ~/code/personal/dotfiles)
+#   DOTFILES_DIR   checkout path        (default: ~/code/personal/dotfiles)
 #   DOTFILES_REF   branch / tag / commit (default: main)
-#   DOTFILES_REPO  override upstream URL (default: github.com/crrow/dotfiles)
+#   DOTFILES_REPO  upstream URL          (default: github.com/crrow/dotfiles)
 
 set -euo pipefail
-IFS=$'\n\t'
 
 readonly DOTFILES_DIR="${DOTFILES_DIR:-$HOME/code/personal/dotfiles}"
 readonly DOTFILES_REF="${DOTFILES_REF:-main}"
@@ -29,7 +21,6 @@ readonly LOCK_DIR="${TMPDIR:-/tmp}/crrow-dotfiles-install.lock"
 readonly PROXY_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/proxy.env"
 readonly NIX_PROFILE=/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
 readonly NIX_BIN=/nix/var/nix/profiles/default/bin/nix
-readonly NIX_FLAGS=(--extra-experimental-features nix-command --extra-experimental-features flakes)
 
 log() { printf '==> %s\n' "$*"; }
 fail() {
@@ -39,265 +30,75 @@ fail() {
 
 [[ "$(uname -s)" == "Darwin" ]] || fail "macOS only (saw $(uname -s))"
 
-# mkdir is atomic — only one caller wins. If a stale lock points at a
-# dead pid, clear it and retry.
-acquire_lock() {
-  if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-    local owner=""
-    [[ -f "$LOCK_DIR/pid" ]] && owner=$(<"$LOCK_DIR/pid")
-    if [[ -n "$owner" ]] && kill -0 "$owner" 2>/dev/null; then
-      fail "another install (pid $owner) is in progress"
-    fi
-    rm -rf "$LOCK_DIR" && mkdir "$LOCK_DIR"
+# Single-install lock. mkdir is atomic; stale locks (owner dead) clear.
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  owner=""
+  [[ -f "$LOCK_DIR/pid" ]] && owner=$(<"$LOCK_DIR/pid")
+  if [[ -n "$owner" ]] && kill -0 "$owner" 2>/dev/null; then
+    fail "another install (pid $owner) is in progress"
   fi
-  printf '%s\n' "$$" >"$LOCK_DIR/pid"
-  trap 'rm -rf "$LOCK_DIR"' EXIT
-  trap 'rm -rf "$LOCK_DIR"; exit 130' INT TERM
-}
+  rm -rf "$LOCK_DIR" && mkdir "$LOCK_DIR"
+fi
+printf '%s\n' "$$" >"$LOCK_DIR/pid"
+trap 'rm -rf "$LOCK_DIR"' EXIT
+trap 'rm -rf "$LOCK_DIR"; exit 130' INT TERM
 
-# Detect proxy from env (the only place a fresh curl|bash sees it), or
-# fall back to the persisted file on re-runs. Persist either way; the
-# rest of the stack (zsh.envExtra, HM proxyLaunchd, sudoers drop-in,
-# nix-daemon plist) reads from $PROXY_FILE or the exported vars.
-persist_proxy() {
-  local p="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-${ALL_PROXY:-${all_proxy:-}}}}}}"
-  if [[ -z "$p" && -f "$PROXY_FILE" ]]; then
-    # shellcheck disable=SC1090
-    . "$PROXY_FILE"
-    p="${HTTPS_PROXY:-${https_proxy:-}}"
-  fi
-  [[ -z "$p" ]] && return 0
-
-  export HTTPS_PROXY="$p" HTTP_PROXY="$p" ALL_PROXY="$p"
-  export https_proxy="$p" http_proxy="$p" all_proxy="$p"
+# (1) Persist proxy if env has one. This file is the SINGLE source of
+# truth for every Nix module that needs proxy (sudoers env_keep, zshenv
+# sourcing, nix-daemon plist injection, /etc/{gitconfig,curlrc}). Nothing
+# else in install.sh touches proxy — Nix handles propagation.
+proxy="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-${ALL_PROXY:-${all_proxy:-}}}}}}"
+if [[ -z "$proxy" && -f "$PROXY_FILE" ]]; then
+  # shellcheck disable=SC1090
+  . "$PROXY_FILE"
+  proxy="${HTTPS_PROXY:-${https_proxy:-}}"
+fi
+if [[ -n "$proxy" ]]; then
+  export HTTPS_PROXY="$proxy" HTTP_PROXY="$proxy" ALL_PROXY="$proxy"
+  export https_proxy="$proxy" http_proxy="$proxy" all_proxy="$proxy"
   mkdir -p "$(dirname "$PROXY_FILE")"
-  cat >"$PROXY_FILE" <<EOF
-# Written by install.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ). Delete to disable.
-export HTTPS_PROXY="$p" HTTP_PROXY="$p" ALL_PROXY="$p"
-export https_proxy="$p" http_proxy="$p" all_proxy="$p"
-EOF
-  log "proxy: $p"
-}
+  printf '# Written by install.sh on %s\nexport HTTPS_PROXY=%q HTTP_PROXY=%q ALL_PROXY=%q\nexport https_proxy=%q http_proxy=%q all_proxy=%q\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    "$proxy" "$proxy" "$proxy" "$proxy" "$proxy" "$proxy" >"$PROXY_FILE"
+  log "proxy: $proxy"
+fi
 
-# nix-darwin's activation runs `sudo -u $USER -i brew bundle …`. The -i
-# (login shell) discards $HTTPS_PROXY exported in this script — and the
-# sudoers env_keep can't help because -i resets env wholesale. Plant
-# the vars in the user's launchd session so login shells pick them up
-# via the launchd-injected environment. No-op when no proxy.
-#
-# HM also runs the equivalent (modules/home/proxy.nix) on every switch,
-# but that activation only fires AFTER system activation completes,
-# which is too late for the first switch's brew bundle.
-launchctl_proxy() {
-  [[ -z "${HTTPS_PROXY:-}" ]] && return 0
-  log "launchctl setenv (user session) proxy vars"
-  local k v
-  for k in HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; do
-    v="${!k:-}"
-    [[ -n "$v" ]] && launchctl setenv "$k" "$v"
-  done
-  # The last for-iteration may end on `[[ -n "" ]]` (returns 1) for an
-  # unset NO_PROXY — without explicit return, `set -e` kills the script
-  # here, before install_nix even runs.
-  return 0
-}
-
-# Xcode Command Line Tools — required by brew to source-build any
-# formula without a prebuilt bottle (yabai, skhd, lua, ghostty, …).
-# nix-homebrew installs brew but NOT the CLT, so we install it here
-# before darwin-rebuild kicks off `brew bundle`.
-#
-# Trick: touching the "in-progress" placeholder makes `softwareupdate -l`
-# list the CLT as an available update, which we can then install
-# non-interactively. Without the placeholder, the only way to install is
-# `xcode-select --install`, which pops a GUI dialog — fine on a real
-# Mac, but blocks VM tests.
-install_xcode_clt() {
-  if [[ -d /Library/Developer/CommandLineTools ]] &&
-    /usr/bin/xcode-select -p >/dev/null 2>&1; then
-    return 0
-  fi
-  log "Xcode Command Line Tools"
-  local placeholder=/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
-  sudo touch "$placeholder"
-  # macOS BSD sed/grep don't grok \s; use POSIX [[:space:]] classes.
-  # `softwareupdate -l` output: ` * Label: Command Line Tools for Xcode-XX.X`.
-  # awk picks the line and strips the `* Label: ` prefix to leave just the
-  # label that `-i` accepts.
-  local label
-  label=$(softwareupdate -l 2>/dev/null \
-    | awk -F'Label:[[:space:]]*' '/^[[:space:]]*\*.*Command Line Tools/ {print $2}' \
-    | sort -V | tail -1)
-  if [[ -n "$label" ]]; then
-    sudo softwareupdate -i "$label" --verbose
-  else
-    # Fallback: GUI installer. Works on real Macs with a user present.
-    xcode-select --install 2>/dev/null || true
-    printf '   waiting for CLT install (manual)…\n'
-    until /usr/bin/xcode-select -p >/dev/null 2>&1; do sleep 10; done
-  fi
-  sudo rm -f "$placeholder"
-}
-
-# Write proxy into /etc/gitconfig and /etc/curlrc — the two
-# config files git and curl read regardless of env. Why we need this:
-# nix-darwin's activate invokes brew bundle via
-#   `sudo --preserve-env=PATH --user=lume env HOMEBREW_NO_AUTO_UPDATE=1 brew bundle …`
-# The `--preserve-env=PATH` whitelist overrides sudoers env_keep — only
-# PATH survives. There's no `-i` either, so /etc/zshenv.local isn't
-# read. Net: brew bundle's git clone (used for `brew tap`) and curl
-# (used for formula source downloads) have no HTTPS_PROXY. Writing
-# the proxy directly into git's and curl's static configs bypasses
-# env entirely.
-# Side effect: every git/curl op on the box uses this proxy. Acceptable
-# for the same reason as proxy.env's reach: machines without a proxy
-# never trip the function (HTTPS_PROXY guard).
-system_proxy_config() {
-  [[ -z "${HTTPS_PROXY:-}" ]] && return 0
-  log "system proxy config: /etc/gitconfig + /etc/curlrc + sudoers"
-  if command -v /usr/bin/git >/dev/null; then
-    sudo /usr/bin/git config --system http.proxy "$HTTPS_PROXY"
-    sudo /usr/bin/git config --system https.proxy "$HTTPS_PROXY"
-  fi
-  # /etc/curlrc — one option per line, `--proxy <url>` form.
-  printf 'proxy = "%s"\n' "$HTTPS_PROXY" | sudo /usr/bin/tee /etc/curlrc >/dev/null
-  # sudoers env_keep — also declared in modules/darwin/proxy.nix, but
-  # nix-darwin's preActivation hook runs AFTER the homebrew phase
-  # (writes the file at the end of the activate script). On first
-  # switch that means brew bundle runs without our env_keep in place
-  # and its inner `sudo --user=lume` strips HTTPS_PROXY. Install the
-  # drop-in eagerly here so brew bundle picks it up immediately.
-  printf '%s\n' \
-    'Defaults env_keep += "HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY no_proxy"' \
-    | sudo /usr/bin/tee /etc/sudoers.d/dotfiles-proxy >/dev/null
-  sudo /bin/chmod 440 /etc/sudoers.d/dotfiles-proxy
-}
-
-# Determinate Nix's daemon plist is root-owned, launchd-managed, and
-# NOT under nix-darwin's control. So this injection has to live in
-# shell, not Nix. No-op when no proxy.
-nix_daemon_proxy() {
-  [[ -z "${HTTPS_PROXY:-}" ]] && return 0
-  local plist=/Library/LaunchDaemons/systems.determinate.nix-daemon.plist
-  [[ -f "$plist" ]] || return 0
-
-  log "nix-daemon: inject proxy into launchd plist"
-  sudo /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables dict" "$plist" 2>/dev/null || true
-  local k v
-  for k in HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy; do
-    v="${!k:-}"
-    [[ -z "$v" ]] && continue
-    sudo /usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:$k" "$plist" 2>/dev/null || true
-    sudo /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:$k string $v" "$plist"
-  done
-  # `kickstart -k` doesn't pick up plist env changes — need a full
-  # bootout/bootstrap, and the daemon's KeepAlive may respawn it past
-  # bootout, so kill stragglers too.
-  sudo launchctl bootout system "$plist" 2>/dev/null || true
-  sudo pkill -9 -f nix-daemon 2>/dev/null || true
-  sleep 1
-  sudo launchctl bootstrap system "$plist"
-  sleep 3
-}
-
-# Determinate's profile script self-guards via __ETC_PROFILE_NIX_SOURCED.
-# Clear the guard so a Terminal session-restored shell re-applies PATH.
-# Always exit 0 — on first install the file doesn't exist yet.
-source_nix() {
-  unset __ETC_PROFILE_NIX_SOURCED
-  # shellcheck source=/dev/null
-  [[ -f "$NIX_PROFILE" ]] && . "$NIX_PROFILE"
-  return 0
-}
-
-install_nix() {
-  source_nix
-  command -v nix >/dev/null 2>&1 && return 0
-  log "Installing Determinate Nix (will prompt for sudo)"
+# (2) Install Determinate Nix (idempotent — skip if already present).
+unset __ETC_PROFILE_NIX_SOURCED
+# shellcheck source=/dev/null
+[[ -f "$NIX_PROFILE" ]] && . "$NIX_PROFILE"
+if ! command -v nix >/dev/null 2>&1; then
+  log "Installing Determinate Nix"
   curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix |
     sh -s -- install macos --no-confirm
-  source_nix
+  # shellcheck source=/dev/null
+  . "$NIX_PROFILE"
   command -v nix >/dev/null || fail "nix not on PATH after install"
-}
+fi
 
-# Tarball over git: no Xcode CLT dance, no nixpkgs#git closure. The
-# user can `git init && git remote add` once HM lands real git.
-fetch_repo() {
-  [[ -f "$DOTFILES_DIR/flake.nix" ]] && return 0
+# (3) Fetch repo (tarball — no git dependency yet). Skip if present.
+if [[ ! -f "$DOTFILES_DIR/flake.nix" ]]; then
   log "Fetching $DOTFILES_REPO@$DOTFILES_REF → $DOTFILES_DIR"
-  local owner_repo
   owner_repo=$(printf '%s' "$DOTFILES_REPO" |
     sed -E 's#.*github\.com[:/]([^/]+/[^/.]+)(\.git)?#\1#')
   mkdir -p "$DOTFILES_DIR"
   curl -fsSL "https://codeload.github.com/${owner_repo}/tar.gz/refs/heads/${DOTFILES_REF}" |
     tar -xz -C "$DOTFILES_DIR" --strip-components=1
-}
+fi
 
-# nix-darwin ≥ 25.x requires darwin-rebuild to run as root. sudo's
-# secure_path strips /nix/... so we hand the absolute path; --flake
-# gets an absolute path because sudo's cwd is unreliable.
+# (4) Hand off to Nix. From here on, everything declarative —
+# sudoers, /etc/gitconfig, /etc/curlrc, Xcode CLT, nix-daemon proxy
+# plist, HM activation, brew bundle — all live in modules/.
 #
-# `path:` prefix instead of bare path: forces nix to evaluate the flake
-# in "path" mode rather than auto-detecting `git+file://`. In git mode
-# only TRACKED files are copied to the /nix/store source, so the
-# gitignored `.user` written above would be invisible and flake.nix
-# would fall back to user="crrow" — wrong on every machine that isn't
-# named crrow (VM tests, forks).
-#
-# Runs twice: brew bundle's first pass can flake on parallel source
-# downloads through a proxy (transient `Broken pipe` / DNS errors),
-# leaving 1-3 formulae uninstalled. darwin-rebuild itself still exits
-# 0 in that case (brew bundle failures aren't fatal to activation), so
-# the second switch picks up the stragglers idempotently. No-op past
-# the first run on the real Mac.
-darwin_switch() {
-  printf '%s\n' "$USER" >"$DOTFILES_DIR/.user"
-  # nix's path: URI parser treats spaces as URI delimiters and the rest
-  # as a path component, so a checkout under `/Volumes/My Shared Files`
-  # (lume VM mount) ends up being looked up under $PWD. URL-encode the
-  # spaces — the only special char that actually appears in our paths.
-  local flake_uri="path:${DOTFILES_DIR// /%20}"
-  local i
-  for i in 1 2; do
-    log "darwin-rebuild switch --flake $flake_uri (attempt $i/2)"
-    sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
-      "$NIX_BIN" "${NIX_FLAGS[@]}" \
-      run nix-darwin/master#darwin-rebuild -- switch --flake "$flake_uri"
-  done
-}
+# .user pins the primary user so the flake works for any login (gitignored).
+# `path:` URI bypasses git-tree mode so the gitignored .user is visible.
+# Spaces are URL-encoded for nix's path: parser.
+# --preserve-env passes proxy through to nix-daemon's libcurl.
+printf '%s\n' "$USER" >"$DOTFILES_DIR/.user"
+log "darwin-rebuild switch --flake path:$DOTFILES_DIR"
+sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
+  "$NIX_BIN" --extra-experimental-features nix-command --extra-experimental-features flakes \
+  run nix-darwin/master#darwin-rebuild -- switch --flake "path:${DOTFILES_DIR// /%20}"
 
-# The HM activation already started yabai/skhd launchd agents, but TCC
-# is SIP-protected — only the user can grant Accessibility. Once they
-# do, restart so the newly-granted permission takes effect.
-grant_accessibility() {
-  command -v yabai >/dev/null 2>&1 || return 0
-  log "Accessibility consent (one-time, manual)"
-  printf '   System Settings will open at Privacy & Security → Accessibility.\n'
-  printf '   Tick yabai and skhd, then come back here and press ENTER.\n'
-  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" 2>/dev/null || true
-  [[ -t 0 ]] || {
-    printf '   (no tty — manually restart: yabai --restart-service && skhd --restart-service)\n'
-    return 0
-  }
-  read -rp "   Press ENTER when ready (Ctrl-C to skip)... " </dev/tty || return 0
-  local svc
-  for svc in yabai skhd; do
-    command -v "$svc" >/dev/null && "$svc" --restart-service >/dev/null 2>&1 || true
-  done
-}
-
-main() {
-  acquire_lock
-  persist_proxy
-  launchctl_proxy
-  install_nix
-  nix_daemon_proxy
-  install_xcode_clt
-  system_proxy_config
-  fetch_repo
-  darwin_switch
-  grant_accessibility
-  log "done — open a new shell to pick up \$SHELL/\$PATH"
-}
-
-main "$@"
+log "done — open a new shell to pick up \$SHELL/\$PATH"
+log "one-time: grant Accessibility to yabai+skhd in System Settings, then 'just postinstall'"

@@ -1,48 +1,98 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
-# Three coordinated mechanisms to get $HTTPS_PROXY through nix-darwin's
-# activation pipeline, so brew bundle's `sudo -u $user -i` inner shell
-# can reach github:
+# Proxy plumbing — owns every system file that needs the proxy value
+# so it propagates through every sub-process nix-darwin's activation
+# spawns. Reads ~/.config/dotfiles/proxy.env (machine-local, written
+# by install.sh on first bootstrap).
 #
-#   1. sudoers env_keep drop-in    — sudo preserves the var
-#   2. /etc/zshenv.local sourcing  — login shells re-export it after sudo -i resets env
-#   3. (HM activation, modules/home/proxy.nix) — launchctl setenv for re-switches
+# What we own:
+#   /etc/sudoers.d/dotfiles-proxy  — env_keep for sudo -u user
+#   /etc/gitconfig                 — http.proxy / https.proxy for `brew tap`
+#   /etc/curlrc                    — proxy = ... for `brew fetch <formula>`
+#   /etc/zshenv.local              — sourced by every login shell
 #
-# (1) without (2) is not enough: `sudo -u $user -i` runs a login shell
-# which resets env wholesale, env_keep notwithstanding. (2) without (1)
-# is not enough either: a non-login sudo path skips zshenv.
+# Why so many places: nix-darwin's activate invokes brew bundle via
+# `sudo --preserve-env=PATH --user=$USER env HOMEBREW_NO_AUTO_UPDATE=1
+#  brew bundle …`. The --preserve-env=PATH whitelist would strip
+# HTTPS_PROXY without our sudoers env_keep. Even with env, brew's
+# `curl --disable` ignores ~/.curlrc but env vars still apply — so
+# both /etc/curlrc and env propagation are needed for full coverage.
+# git clone's tap fetch reads /etc/gitconfig regardless of env.
 #
-# All three read from ~/.config/dotfiles/proxy.env (machine-local,
-# written by install.sh). No proxy → all three are silent no-ops.
+# All write steps live under a NEW activation phase `proxyConfig`,
+# which `homebrew.deps` depends on, so the files are in place BEFORE
+# brew bundle runs on the very first switch. Setting them in
+# preActivation isn't enough — nix-darwin places the entry late in
+# the activate script in practice.
 
 let
-  sudoersFile = pkgs.writeText "dotfiles-proxy" ''
-    Defaults env_keep += "HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY no_proxy"
+  proxyEnv = "$HOME/.config/dotfiles/proxy.env";
+
+  # Single shell block reused across activationScripts. Reads proxy.env
+  # if present, then re-writes each system file with the value (or a
+  # no-proxy stub if the file isn't there). Safe to run on every switch.
+  writeProxySystemConfig = ''
+    # shellcheck source=/dev/null
+    if [ -f "${proxyEnv}" ]; then
+      . "${proxyEnv}"
+    else
+      HTTPS_PROXY=""
+    fi
+
+    # /etc/sudoers.d/dotfiles-proxy — always present. env_keep is a
+    # no-op on absent vars, so this is safe even without a proxy.
+    sudoers=$(/usr/bin/mktemp -t dotfiles-proxy)
+    printf '%s\n' \
+      'Defaults env_keep += "HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy NO_PROXY no_proxy"' \
+      >"$sudoers"
+    /usr/bin/install -m 440 -o root -g wheel \
+      "$sudoers" /etc/sudoers.d/dotfiles-proxy
+    /bin/rm -f "$sudoers"
+
+    if [ -n "$HTTPS_PROXY" ]; then
+      # /etc/gitconfig — brew tap → git clone reads this regardless of env.
+      /usr/bin/git config --system http.proxy  "$HTTPS_PROXY"
+      /usr/bin/git config --system https.proxy "$HTTPS_PROXY"
+
+      # /etc/curlrc — last-resort proxy for any curl invocation that
+      # doesn't carry env (brew passes `--disable` to skip curlrc, but
+      # env still applies; this is for everything else).
+      printf 'proxy = "%s"\n' "$HTTPS_PROXY" >/etc/curlrc
+      /bin/chmod 0644 /etc/curlrc
+    else
+      # No proxy: clean up so we don't leave stale config.
+      /usr/bin/git config --system --unset-all http.proxy  2>/dev/null || true
+      /usr/bin/git config --system --unset-all https.proxy 2>/dev/null || true
+      /bin/rm -f /etc/curlrc
+    fi
   '';
 in
 {
   ###
-  ### (1) sudoers env_keep — installed with `install -m 440 -o root -g
-  ### wheel` in preActivation so it's in place BEFORE the homebrew
-  ### activation phase fires `sudo -u $user brew bundle`. (postActivation
-  ### would write it too late on the first switch.)
-  ###
-  system.activationScripts.preActivation.text = ''
-    /usr/bin/install -m 440 -o root -g wheel \
-      ${sudoersFile} /etc/sudoers.d/dotfiles-proxy
-  '';
-
-  ###
-  ### (2) /etc/zshenv.local — nix-darwin's generated /etc/zshenv ends
-  ### with `[ -f /etc/zshenv.local ] && source /etc/zshenv.local`, so
-  ### anything we drop here runs for every zsh login shell, including
-  ### the inner shell spawned by `sudo -u $user -i` during brew bundle.
-  ### The HOME used is the inner shell's HOME (i.e. lume's), so the
-  ### path resolves correctly.
+  ### /etc/zshenv.local — pulled in by nix-darwin's generated /etc/zshenv
+  ### at the end (`[ -f /etc/zshenv.local ] && source /etc/zshenv.local`).
+  ### Sources proxy.env so every login shell — including the inner one
+  ### spawned by `sudo -u user -i` during HM activation — picks up the
+  ### proxy after env-strip.
   ###
   environment.etc."zshenv.local".text = ''
     # Per-machine proxy, written by install.sh on first bootstrap.
     [ -f "$HOME/.config/dotfiles/proxy.env" ] && \
       . "$HOME/.config/dotfiles/proxy.env"
   '';
+
+  ###
+  ### proxyConfig activation entry — runs the writeProxySystemConfig
+  ### block at switch time. Made a dep of `homebrew` below so it lands
+  ### BEFORE brew bundle on the very first switch.
+  ###
+  system.activationScripts.proxyConfig = {
+    text = writeProxySystemConfig;
+  };
+
+  # Force homebrew's activation phase to wait on us. Without this our
+  # entry could schedule after homebrew in the DAG. lib.mkAfter appends
+  # without clobbering nix-darwin's defaults.
+  system.activationScripts.homebrew.deps =
+    lib.mkAfter [ "proxyConfig" ];
 }

@@ -28,6 +28,20 @@ update:
     git pull --ff-only
     darwin-rebuild switch --flake .
 
+# Post-install: grant Accessibility consent then restart yabai+skhd so
+# they pick up the newly-granted permission. The consent itself is
+# SIP-protected — only the user can tick the boxes in System Settings.
+postinstall:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Open System Settings → Privacy & Security → Accessibility."
+    echo "Tick yabai and skhd, then press Enter here to restart their services."
+    open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" 2>/dev/null || true
+    read -rp "Press Enter when done (Ctrl-C to cancel)... "
+    for svc in yabai skhd; do
+      command -v "$svc" >/dev/null && "$svc" --restart-service && echo "  ✓ $svc restarted" || echo "  ! $svc not installed or restart failed"
+    done
+
 # ─── VM testing ────────────────────────────────────────────────────────────
 
 # Pull the read-only baseline VM image if missing (~22 GB, one-off).

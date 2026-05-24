@@ -7,5 +7,7 @@
     ./system.nix
     ./homebrew.nix
     ./proxy.nix
+    ./xcode-clt.nix
+    ./nix-daemon-proxy.nix
   ];
 }
