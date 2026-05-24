@@ -1,4 +1,4 @@
-{ ... }:
+{ lib, ... }:
 
 # Determinate Nix's daemon plist is root-owned, launchd-managed, and
 # NOT under nix-darwin's purview (`nix.enable = false` cedes daemon
@@ -40,7 +40,8 @@ let
   '';
 in
 {
-  system.activationScripts.nixDaemonProxy = {
-    text = injectScript;
-  };
+  # Custom activationScript names are not in nix-darwin's known phase
+  # list, so they'd never execute. Inject into preActivation.text
+  # instead — runs every switch, idempotent (Delete-then-Add).
+  system.activationScripts.preActivation.text = lib.mkBefore injectScript;
 }

@@ -82,17 +82,15 @@ in
   '';
 
   ###
-  ### proxyConfig activation entry — runs the writeProxySystemConfig
-  ### block at switch time. Made a dep of `homebrew` below so it lands
-  ### BEFORE brew bundle on the very first switch.
+  ### preActivation.text runs early in nix-darwin's activate script,
+  ### before the homebrew phase. lib.mkBefore puts our text at the
+  ### very top of the preActivation block (multiple modules contribute
+  ### text — mkBefore/default/mkAfter set ordering within the merge).
   ###
-  system.activationScripts.proxyConfig = {
-    text = writeProxySystemConfig;
-  };
-
-  # Force homebrew's activation phase to wait on us. Without this our
-  # entry could schedule after homebrew in the DAG. lib.mkAfter appends
-  # without clobbering nix-darwin's defaults.
-  system.activationScripts.homebrew.deps =
-    lib.mkAfter [ "proxyConfig" ];
+  ### nix-darwin's system.activationScripts submodule only has .text;
+  ### there's no .deps field (that's NixOS's DAG, not nix-darwin's).
+  ### So we can't depend on `homebrew`; instead we rely on phase order
+  ### (preActivation → ... → homebrew → postActivation).
+  ###
+  system.activationScripts.preActivation.text = lib.mkBefore writeProxySystemConfig;
 }

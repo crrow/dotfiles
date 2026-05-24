@@ -46,11 +46,12 @@ let
   '';
 in
 {
-  system.activationScripts.xcodeClt = {
-    text = installXcodeCltScript;
-  };
-
-  # brew bundle pulls source-built formulae that need CLT. Wait on us.
-  system.activationScripts.homebrew.deps =
-    lib.mkAfter [ "xcodeClt" ];
+  # nix-darwin's activationScripts submodule has no .deps; we rely on
+  # phase ordering (preActivation runs before homebrew). lib.mkBefore
+  # places this text at the start of the merged preActivation block.
+  # Add a guard so multiple modules contributing to preActivation can
+  # all coexist (each prefixes its own concern).
+  system.activationScripts.preActivation.text = lib.mkBefore ''
+    ${installXcodeCltScript}
+  '';
 }
