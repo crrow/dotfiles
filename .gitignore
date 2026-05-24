@@ -6,3 +6,6 @@ result-*
 # parallel-agent git worktrees; see CLAUDE.md "Parallel work via worktrees".
 /.worktrees/
 nvim/lazy-lock.json
+
+.Trashes/
+.fseventsd/

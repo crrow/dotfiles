@@ -22,9 +22,26 @@
     # No nixpkgs.follows: nix-homebrew does not declare a nixpkgs input
     # of its own; following a non-existent input is a warning.
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
+
+    # Marketplace + Open VSX extensions as Nix packages, auto-updated.
+    # Used by modules/home/vscode.nix for declarative `programs.vscode`
+    # extensions — covers the long tail nixpkgs.vscode-extensions doesn't.
+    nix-vscode-extensions = {
+      url = "github:nix-community/nix-vscode-extensions";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Binary blobs (wallpapers) live in a separate private repo so this
+    # one stays small and text-only. `flake = false` means "fetch as a
+    # plain source tree, don't try to evaluate it as a flake".
+    # Switch to `github:crrow/wallpapers` if you ever flip the repo public.
+    wallpapers = {
+      url   = "git+ssh://git@github.com/crrow/wallpapers.git";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, nix-darwin, home-manager, nix-homebrew, ... }@inputs:
+  outputs = { self, nixpkgs, nix-darwin, home-manager, nix-homebrew, nix-vscode-extensions, ... }@inputs:
     let
       system = "aarch64-darwin";
 
@@ -50,6 +67,11 @@
         modules = [
           hostPath
 
+          # Make `pkgs.vscode-marketplace.*` and `pkgs.open-vsx.*`
+          # available everywhere the shared nixpkgs is used (incl. HM,
+          # because useGlobalPkgs = true).
+          { nixpkgs.overlays = [ nix-vscode-extensions.overlays.default ]; }
+
           home-manager.darwinModules.home-manager
           {
             home-manager = {
@@ -61,7 +83,7 @@
               # aborting activation. Without this, the first switch on a
               # populated $HOME fails noisily.
               backupFileExtension = "hm-backup";
-              extraSpecialArgs = { inherit user; };
+              extraSpecialArgs = { inherit user inputs; };
               users.${user}    = import ./modules/home;
             };
           }

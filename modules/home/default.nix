@@ -9,6 +9,8 @@
     ./mise.nix
     ./fonts.nix
     ./neovim.nix
+    ./vscode.nix
+    ./wallpaper.nix
     ./window-manager.nix
     ./proxy.nix
   ];

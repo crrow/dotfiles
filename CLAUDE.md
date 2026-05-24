@@ -4,6 +4,11 @@ Single source of truth for AI assistants in this repo. `AGENTS.md`,
 `GEMINI.md`, `.cursorrules`, `.windsurfrules` are symlinks to this file —
 edit `CLAUDE.md`, never create those as separate files.
 
+The same single-source pattern applies to harness configuration:
+`.claude/` is canonical; `.codex/hooks/` is a symlink to
+`.claude/hooks/` so Claude Code and Codex share one set of guard
+scripts. Edit under `.claude/`, never duplicate into `.codex/`.
+
 ## Read first — the why
 
 - [`goal.md`](./goal.md) — what this repo is (personal macOS Nix flake),

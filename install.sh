@@ -237,6 +237,13 @@ fetch_repo() {
 # secure_path strips /nix/... so we hand the absolute path; --flake
 # gets an absolute path because sudo's cwd is unreliable.
 #
+# `path:` prefix instead of bare path: forces nix to evaluate the flake
+# in "path" mode rather than auto-detecting `git+file://`. In git mode
+# only TRACKED files are copied to the /nix/store source, so the
+# gitignored `.user` written above would be invisible and flake.nix
+# would fall back to user="crrow" — wrong on every machine that isn't
+# named crrow (VM tests, forks).
+#
 # Runs twice: brew bundle's first pass can flake on parallel source
 # downloads through a proxy (transient `Broken pipe` / DNS errors),
 # leaving 1-3 formulae uninstalled. darwin-rebuild itself still exits
@@ -245,12 +252,17 @@ fetch_repo() {
 # the first run on the real Mac.
 darwin_switch() {
   printf '%s\n' "$USER" >"$DOTFILES_DIR/.user"
+  # nix's path: URI parser treats spaces as URI delimiters and the rest
+  # as a path component, so a checkout under `/Volumes/My Shared Files`
+  # (lume VM mount) ends up being looked up under $PWD. URL-encode the
+  # spaces — the only special char that actually appears in our paths.
+  local flake_uri="path:${DOTFILES_DIR// /%20}"
   local i
   for i in 1 2; do
-    log "darwin-rebuild switch --flake $DOTFILES_DIR (attempt $i/2)"
+    log "darwin-rebuild switch --flake $flake_uri (attempt $i/2)"
     sudo --preserve-env=HTTP_PROXY,HTTPS_PROXY,http_proxy,https_proxy,ALL_PROXY,all_proxy \
       "$NIX_BIN" "${NIX_FLAGS[@]}" \
-      run nix-darwin/master#darwin-rebuild -- switch --flake "$DOTFILES_DIR"
+      run nix-darwin/master#darwin-rebuild -- switch --flake "$flake_uri"
   done
 }
 
