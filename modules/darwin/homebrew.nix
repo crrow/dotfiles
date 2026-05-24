@@ -46,7 +46,12 @@
       "joncrangle/tap"
     ];
     brews = [
-      "deja"
+      # Shell stack — sourced by home/dot_zshrc. Nothing else wires them.
+      "powerlevel10k"              # prompt theme
+      "zsh-syntax-highlighting"    # syntax highlighting for zsh
+      "deja"                       # smarter autosuggestions (replaces zsh-autosuggestions)
+
+      # Window manager + status bar
       "yabai"                      # tiling window manager
       "skhd"                       # hotkey daemon
       "sketchybar"                 # status bar

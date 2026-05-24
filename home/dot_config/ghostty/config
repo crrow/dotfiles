@@ -1,0 +1,26 @@
+cursor-style                   = bar
+cursor-opacity                 = 0.8
+cursor-invert-fg-bg            = true
+
+font-family                    = "SeriousShanns Nerd Font Mono"
+font-size                      = 14
+font-thicken                   = true
+
+macos-titlebar-style           = tabs
+window-height                  = 30
+window-width                   = 110
+
+# Look and feel
+adjust-cursor-thickness        = 3
+adjust-underline-position      = 3
+bold-is-bright                 = true
+link-url                       = true
+mouse-hide-while-typing        = true
+window-vsync                   = true
+background-opacity             = 0.8
+background-blur                = true
+
+# Shader (bundled in this repo's ghostty/shaders/, symlinked next to
+# this config so Ghostty's `custom-shader` relative resolution works).
+custom-shader-animation        = always
+custom-shader                  = shaders/just-snow.glsl

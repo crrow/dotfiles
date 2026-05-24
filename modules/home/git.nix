@@ -1,33 +1,13 @@
-{ ... }:
+{ pkgs, ... }:
 
+# Git config lives in home/dot_gitconfig + home/dot_gitignore_global so
+# it's also usable without Nix. delta (the diff pager) is still installed
+# via `home.packages` because we don't get the binary otherwise — but the
+# git-side wiring (`pager = delta`, `interactive.diffFilter`, etc.) lives
+# in the gitconfig file alongside everything else.
 {
-  programs.git = {
-    enable = true;
+  home.file.".gitconfig".source        = ../../home/dot_gitconfig;
+  home.file.".gitignore_global".source = ../../home/dot_gitignore_global;
 
-    # As of home-manager 25.11, user{Name,Email} + extraConfig were
-    # folded into a single `settings` tree that mirrors gitconfig
-    # sections directly.
-    settings = {
-      user.name            = "crrow";
-      user.email           = "hahadaxigua@gmail.com";
-      init.defaultBranch   = "main";
-      pull.ff              = "only";
-      push.autoSetupRemote = true;
-    };
-
-    ignores = [
-      ".DS_Store"
-      ".idea"
-      ".vscode"
-      "*.swp"
-    ];
-  };
-
-  # delta moved out of programs.git in HM ≥ 25.11; live as a top-level
-  # module that opt-in wires itself into git via the explicit
-  # `enableGitIntegration` flag (the implicit wiring is deprecated).
-  programs.delta = {
-    enable = true;
-    enableGitIntegration = true;
-  };
+  home.packages = [ pkgs.delta ];
 }

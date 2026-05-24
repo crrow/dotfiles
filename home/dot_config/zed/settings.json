@@ -1,0 +1,127 @@
+{
+  "project_panel": { "dock": "left" },
+  "outline_panel": { "dock": "left" },
+  "collaboration_panel": { "dock": "left" },
+  "git_panel": { "dock": "left" },
+
+  "icon_theme": "Material Icon Theme",
+  "theme": "Catppuccin Frappé (Blur)",
+
+  "show_signature_help_after_edits": true,
+  "features": { "edit_prediction_provider": "zed" },
+
+  "agent": {
+    "dock": "right",
+    "default_model": {
+      "provider": "zed.dev",
+      "model": "claude-sonnet-4"
+    }
+  },
+
+  "autosave": "on_focus_change",
+  "base_keymap": "VSCode",
+
+  "buffer_font_size": 16,
+  "buffer_font_family": "Google Sans Code",
+  "ui_font_size": 16,
+
+  "cursor_blink": true,
+  "cursor_shape": "block",
+  "current_line_highlight": "gutter",
+
+  "enable_language_server": true,
+  "formatter": "language_server",
+  "format_on_save": "on",
+  "tab_size": 4,
+  "vim_mode": false,
+
+  "git": { "inline_blame": { "enabled": true } },
+  "journal": { "hour_format": "hour24" },
+  "tabs": { "git_status": true },
+
+  "inlay_hints": {
+    "enabled": true,
+    "show_type_hints": true,
+    "show_parameter_hints": true,
+    "show_other_hints": true
+  },
+
+  "languages": {
+    "Rust": { "preferred_line_length": 60 },
+    "Zig": {
+      "formatter": "language_server",
+      "format_on_save": "on",
+      "language_servers": ["zls", "..."],
+      "code_actions_on_format": {
+        "source.fixAll": true,
+        "source.organizeImports": true
+      }
+    },
+    "JSON": { "tab_size": 4 },
+    "YAML": { "tab_size": 4 }
+  },
+
+  "lsp": {
+    "gopls": {
+      "initialization_options": {
+        "hints": {
+          "assignVariableTypes": true,
+          "compositeLiteralFields": true,
+          "compositeLiteralTypes": true,
+          "constantValues": true,
+          "functionTypeParameters": true,
+          "parameterNames": true,
+          "rangeVariableTypes": true
+        }
+      }
+    },
+    "rust-analyzer": {
+      "initialization_options": {
+        "cargo": {
+          "allFeatures": true,
+          "buildScripts": {
+            "enable": true,
+            "rebuildOnSave": true
+          }
+        },
+        "check": {
+          "allTargets": false,
+          "command": "check"
+        },
+        "checkOnSave": true,
+        "hover": { "references": { "enabled": true } },
+        "imports": {
+          "granularity": { "group": "crate" },
+          "prefix": "self",
+          "merge": { "glob": true }
+        },
+        "inlayHints": {
+          "maxLength": null,
+          "lifetimeElisionHints": {
+            "useParameterNames": true,
+            "enable": "skip_trivial"
+          },
+          "closureReturnTypeHints": { "enable": "always" }
+        },
+        "procMacro": { "enable": true }
+      }
+    },
+    "zls": {
+      "binary": { "path": "/opt/homebrew/bin/zls" },
+      "settings": { "zig_exe_path": "/opt/homebrew/bin/zig" }
+    },
+    "taplo": {
+      "settings": { "array_auto_collapse": false }
+    }
+  },
+
+  "terminal": {
+    "font_family": "JetBrainsMonoNL Nerd Font",
+    "blinking": "on"
+  },
+
+  "telemetry": {
+    "diagnostics": false,
+    "metrics": false
+  }
+}

@@ -58,6 +58,36 @@ Then run `just postinstall` to restart the services.
 Env knobs: `DOTFILES_DIR` (default `~/code/personal/dotfiles`),
 `DOTFILES_REF` (default `main`).
 
+## Without Nix — plain dotfiles via [chezmoi](https://chezmoi.io)
+
+All user-level configs (zsh, git, mise, zellij, ghostty, VS Code, Zed)
+also live as their *real* config files under `home/`, named with
+chezmoi's `dot_` source convention so the same tree drives both paths:
+
+```sh
+brew install chezmoi
+chezmoi init --apply --source ~/code/personal/dotfiles/home
+```
+
+That writes `~/.zshrc`, `~/.gitconfig`, `~/.config/mise/config.toml`,
+etc. straight from `home/dot_*`. No Nix involved. Re-run `chezmoi apply`
+on edits to the repo.
+
+Caveats for chezmoi mode:
+
+- VS Code on macOS reads from `~/Library/Application Support/Code/User/`
+  not `~/.config/Code/`. The repo stores the JSONs under
+  `home/dot_config/Code/User/` for chezmoi-friendliness; manually
+  symlink them across (`ln -sf ~/.config/Code/User/settings.json
+  "~/Library/Application Support/Code/User/settings.json"`). The Nix
+  module handles this automatically.
+- chezmoi doesn't install packages. Brew yabai/skhd/sketchybar/ghostty/
+  zed/powerlevel10k/zsh-syntax-highlighting/deja yourself if you want
+  the full setup.
+- The Nix and chezmoi mode share a single source-of-truth for config
+  *content* — but ownership of the resulting file in `$HOME` will fight
+  if you run both. Pick one.
+
 ## Day-to-day
 
 ```sh

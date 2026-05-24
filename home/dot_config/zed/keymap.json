@@ -1,0 +1,16 @@
+[
+  {
+    "context": "Editor",
+    "bindings": {
+      "ctrl-shift-g": "editor::Rename",
+      "ctrl-shift-h": "editor::GoToDefinition",
+      "cmd-alt-n":    "editor::Rename"
+    }
+  },
+  {
+    "context": "Workspace",
+    "bindings": {
+      "ctrl--": "workspace::ToggleBottomDock"
+    }
+  }
+]

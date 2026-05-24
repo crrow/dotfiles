@@ -1,17 +1,8 @@
 { ... }:
 
+# zellij config lives in home/dot_config/zellij/config.kdl so it's also
+# usable without Nix. Drop programs.zellij — HM's wrapper just renders
+# settings to that same file; direct symlink is simpler.
 {
-  programs.zellij = {
-    enable = true;
-    settings = {
-      theme              = "gruvbox-dark";
-      default_shell      = "zsh";
-      default_layout     = "compact";
-      mouse_mode         = true;
-      copy_on_select     = true;
-      scroll_buffer_size = 100000;
-      pane_frames        = false;
-      simplified_ui      = true;
-    };
-  };
+  home.file.".config/zellij/config.kdl".source = ../../home/dot_config/zellij/config.kdl;
 }

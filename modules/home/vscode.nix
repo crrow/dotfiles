@@ -175,165 +175,20 @@ in
   programs.vscode = {
     enable = true;
 
+    # Keep the HM-managed extension set — that's what nix-vscode-extensions
+    # is for. settings + keybindings live as plain JSON files under
+    # home/dot_config/Code/User/ so they're usable outside Nix too.
     profiles.default = {
       extensions = lib.filter (e: e != null) (map lookupExt extensionIds);
-
-      # Mirrored from ~/Library/Application Support/Code/User/settings.json.
-      # When you tweak settings in the VS Code UI:
-      #   1. HM writes this file read-only, so UI edits won't stick.
-      #   2. Either edit here directly, or temporarily set
-      #      `mutableExtensionsDir = true` / unlink the file to experiment.
-      #   3. Mirror the diff back into this attrset to keep things declarative.
-      userSettings = {
-        "editor.fontFamily" = "SeriousShanns Nerd Font Mono, Ioskeley Mono,    Google Sans Code, Maple Mono, JetBrainsMono Nerd Font, Comic Mono, Menlo, Monaco, 'Courier New', monospace";
-        "editor.fontSize" = 16;
-        "editor.cursorBlinking" = "smooth";
-        "editor.cursorSmoothCaretAnimation" = "on";
-        "editor.cursorStyle" = "block";
-        "files.autoSave" = "afterDelay";
-        "editor.defaultFormatter" = "rust-lang.rust-analyzer";
-        "editor.formatOnSave" = true;
-        "editor.formatOnPaste" = true;
-        "editor.minimap.enabled" = false;
-        "editor.scrollbar.horizontal" = "visible";
-        "editor.bracketPairColorization.enabled" = true;
-        "explorer.compactFolders" = true;
-        "window.zoomLevel" = 1;
-        "editor.guides.bracketPairs" = "active";
-        "editor.bracketPairColorization.independentColorPoolPerBracketType" = true;
-        "editor.semanticTokenColorCustomizations" = {
-          rules = {
-            # Empty string disables the default underline on mutable refs.
-            "*.mutable" = { fontStyle = ""; };
-          };
-        };
-        "window.titleBarStyle" = "custom";
-        "terminal.integrated.fontFamily" = "JetBrainsMono Nerd Font";
-        "terminal.integrated.fontSize" = 13;
-        "workbench.iconTheme" = "material-icon-theme";
-        "dev.containers.cacheVolume" = false;
-        "remote.portsAttributes" = {
-          "7890" = { onAutoForward = "ignore"; };
-          "443"  = { protocol = "https"; };
-          "8443" = { protocol = "https"; };
-        };
-        "github.copilot.editor.enableAutoCompletions" = true;
-        "[typst]" = {
-          "editor.formatOnSave" = true;
-        };
-        "editor.accessibilitySupport" = "off";
-        "python.analysis.typeCheckingMode" = "standard";
-        "makefile.configureOnOpen" = true;
-        "editor.allowVariableFontsInAccessibilityMode" = true;
-        "editor.codeLensFontFamily" = "Google Sans Code";
-        "go.toolsManagement.autoUpdate" = true;
-        "go.inlayHints.assignVariableTypes" = true;
-        "go.inlayHints.compositeLiteralFields" = true;
-        "go.inlayHints.compositeLiteralTypes" = true;
-        "go.inlayHints.constantValues" = true;
-        "go.inlayHints.functionTypeParameters" = true;
-        "go.inlayHints.parameterNames" = true;
-        "go.inlayHints.rangeVariableTypes" = true;
-        "[go]" = {
-          "editor.insertSpaces" = true;
-          "editor.formatOnSave" = true;
-          "editor.defaultFormatter" = "golang.go";
-          "editor.codeActionsOnSave" = {
-            "source.organizeImports" = "always";
-          };
-        };
-        "[jsonc]" = {
-          "editor.defaultFormatter" = "vscode.json-language-features";
-        };
-        "[rust]" = {
-          "editor.defaultFormatter" = "rust-lang.rust-analyzer";
-          "editor.formatOnSave" = true;
-        };
-        "rust-analyzer.checkOnSave" = false;
-        "rust-analyzer.cargo.targetDir" = true;
-        "rust-analyzer.cargo.buildScripts.rebuildOnSave" = false;
-        "rust-analyzer.rustfmt.overrideCommand" = [ "rustfmt" "+nightly" ];
-        "[toml]" = {
-          "editor.defaultFormatter" = "tamasfe.even-better-toml";
-          "editor.formatOnSave" = true;
-        };
-        "gitlens.ai.model" = "vscode";
-        "gitlens.ai.vscode.model" = "copilot:gpt-4.1";
-        "zig.zls.enabled" = "on";
-        "claudeCode.preferredLocation" = "panel";
-        "claudeCode.useCtrlEnterToSend" = true;
-        "terminal.integrated.cursorBlinking" = true;
-        "terminal.integrated.shellIntegration.enabled" = true;
-        "workbench.colorCustomizations" = { };
-        "editor.fontLigatures" = true;
-        "chat.mcp.gallery.enabled" = true;
-        "claudeCode.selectedModel" = "default";
-        "github.copilot.nextEditSuggestions.enabled" = true;
-        "workbench.colorTheme" = "Xcode Civic (Dark)";
-        "git.openRepositoryInParentFolders" = "always";
-        "files.exclude" = {
-          "**/__pycache__"     = true;
-          "**/.pytest_cache"   = true;
-          "**/.ruff_cache"     = true;
-          "**/.venv"           = true;
-        };
-        "json.schemaDownload.trustedDomains" = {
-          "https://schemastore.azurewebsites.net/"            = true;
-          "https://raw.githubusercontent.com/microsoft/vscode/" = true;
-          "https://raw.githubusercontent.com/devcontainers/spec/" = true;
-          "https://www.schemastore.org/"                      = true;
-          "https://json.schemastore.org/"                     = true;
-          "https://json-schema.org/"                          = true;
-          "https://developer.microsoft.com/json-schemas/"     = true;
-          "https://biomejs.dev"                               = true;
-        };
-      };
-
-      # Mirrored from ~/Library/Application Support/Code/User/keybindings.json.
-      # Entries with a leading "-" in `command` *unbind* the default; the
-      # paired positive entry then rebinds the same key elsewhere.
-      keybindings = [
-        {
-          key = "ctrl+shift+n";
-          command = "editor.action.rename";
-          when = "editorHasRenameProvider && editorTextFocus && !editorReadonly";
-        }
-        {
-          key = "f2";
-          command = "-editor.action.rename";
-          when = "editorHasRenameProvider && editorTextFocus && !editorReadonly";
-        }
-        {
-          key = "ctrl+shift+-";
-          command = "-workbench.action.navigateForward";
-          when = "canNavigateForward";
-        }
-        {
-          key = "ctrl+shift+-";
-          command = "editor.foldAll";
-          when = "editorTextFocus && foldingEnabled";
-        }
-        {
-          key = "cmd+k cmd+0";
-          command = "-editor.foldAll";
-          when = "editorTextFocus && foldingEnabled";
-        }
-        {
-          key = "shift+alt+f12";
-          command = "-references-view.findReferences";
-          when = "editorHasReferenceProvider";
-        }
-        {
-          key = "ctrl+shift+=";
-          command = "editor.unfoldAll";
-          when = "editorTextFocus && foldingEnabled";
-        }
-        {
-          key = "cmd+k cmd+j";
-          command = "-editor.unfoldAll";
-          when = "editorTextFocus && foldingEnabled";
-        }
-      ];
     };
   };
+
+  # macOS VS Code reads config from ~/Library/Application Support/Code/User/,
+  # NOT ~/.config/Code. Symlink both — chezmoi-source under home/dot_config/
+  # Code/User/ stays the source-of-truth path. HM lets us put files anywhere
+  # under $HOME so the macOS path works directly.
+  home.file."Library/Application Support/Code/User/settings.json".source =
+    ../../home/dot_config/Code/User/settings.json;
+  home.file."Library/Application Support/Code/User/keybindings.json".source =
+    ../../home/dot_config/Code/User/keybindings.json;
 }

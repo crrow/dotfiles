@@ -1,0 +1,6 @@
+# Sourced for every zsh invocation (interactive, non-interactive,
+# login). Lives in .zshenv (not .zshrc) so non-interactive shells
+# (e.g. `sudo -u user -i` during nix-darwin's brew bundle) also pick
+# up the proxy. proxy.env is machine-local — absent on most hosts;
+# the `[ -f ]` guard makes this a no-op when missing.
+[ -f "$HOME/.config/dotfiles/proxy.env" ] && . "$HOME/.config/dotfiles/proxy.env"

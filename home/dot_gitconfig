@@ -1,0 +1,29 @@
+[user]
+	name = crrow
+	email = hahadaxigua@gmail.com
+
+[init]
+	defaultBranch = main
+
+[pull]
+	ff = only
+
+[push]
+	autoSetupRemote = true
+
+[core]
+	excludesfile = ~/.gitignore_global
+	pager = delta
+
+[interactive]
+	diffFilter = delta --color-only
+
+[delta]
+	navigate = true
+	light = false
+
+[merge]
+	conflictstyle = diff3
+
+[diff]
+	colorMoved = default

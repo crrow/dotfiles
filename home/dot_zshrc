@@ -1,0 +1,65 @@
+# Enable Powerlevel10k instant prompt. Keep near the top.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+###
+### oh-my-zsh
+###   brew install --no-quarantine ohmyzsh  (or curl install script)
+###   The Nix-managed case symlinks ~/.oh-my-zsh from the HM-built copy;
+###   plain-dotfile users install it themselves (one-shot).
+###
+export ZSH="$HOME/.oh-my-zsh"
+ZSH_THEME=""                       # powerlevel10k owns the prompt
+plugins=(git colorize)
+[ -f "$ZSH/oh-my-zsh.sh" ] && source "$ZSH/oh-my-zsh.sh"
+
+###
+### powerlevel10k
+###   brew install powerlevel10k
+###   The Nix path also resolves /opt/homebrew/share/... because brew is
+###   nix-darwin-managed and the binary lives at the same canonical path.
+###
+for p10k_src in \
+  "/opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme" \
+  "/usr/local/share/powerlevel10k/powerlevel10k.zsh-theme"; do
+  [ -f "$p10k_src" ] && source "$p10k_src" && break
+done
+
+###
+### zsh-syntax-highlighting (brew install zsh-syntax-highlighting)
+### Source AFTER all other zle widgets.
+###
+for zsh_hl in \
+  "/opt/homebrew/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" \
+  "/usr/local/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"; do
+  [ -f "$zsh_hl" ] && source "$zsh_hl" && break
+done
+
+###
+### Aliases
+###
+alias ll='ls -lah'
+alias g='git'
+alias zj='zellij'
+
+###
+### Project-local runtimes
+###
+command -v mise >/dev/null && eval "$(mise activate zsh)"
+
+###
+### Deja — smarter zsh autosuggestions (brew install giammarco-ferranti/deja/deja)
+### Replaces zsh-autosuggestions; do NOT enable both (POSTDISPLAY widget fight).
+###
+command -v deja >/dev/null && eval "$(deja init zsh)"
+
+###
+### Powerlevel10k user config (~/.p10k.zsh symlinked from this repo)
+###
+[[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"
+
+###
+### Local, untracked overrides
+###
+[[ -f "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"

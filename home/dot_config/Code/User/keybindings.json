@@ -1,0 +1,45 @@
+// VS Code keybindings.
+// Entries with a leading "-" in `command` *unbind* the default; the
+// paired positive entry then rebinds the same key elsewhere.
+[
+  {
+    "key": "ctrl+shift+n",
+    "command": "editor.action.rename",
+    "when": "editorHasRenameProvider && editorTextFocus && !editorReadonly"
+  },
+  {
+    "key": "f2",
+    "command": "-editor.action.rename",
+    "when": "editorHasRenameProvider && editorTextFocus && !editorReadonly"
+  },
+  {
+    "key": "ctrl+shift+-",
+    "command": "-workbench.action.navigateForward",
+    "when": "canNavigateForward"
+  },
+  {
+    "key": "ctrl+shift+-",
+    "command": "editor.foldAll",
+    "when": "editorTextFocus && foldingEnabled"
+  },
+  {
+    "key": "cmd+k cmd+0",
+    "command": "-editor.foldAll",
+    "when": "editorTextFocus && foldingEnabled"
+  },
+  {
+    "key": "shift+alt+f12",
+    "command": "-references-view.findReferences",
+    "when": "editorHasReferenceProvider"
+  },
+  {
+    "key": "ctrl+shift+=",
+    "command": "editor.unfoldAll",
+    "when": "editorTextFocus && foldingEnabled"
+  },
+  {
+    "key": "cmd+k cmd+j",
+    "command": "-editor.unfoldAll",
+    "when": "editorTextFocus && foldingEnabled"
+  }
+]
