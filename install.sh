@@ -76,6 +76,31 @@ if ! command -v nix >/dev/null 2>&1; then
   command -v nix >/dev/null || fail "nix not on PATH after install"
 fi
 
+# (2b) Inject proxy into Determinate's nix-daemon launchd plist. Has
+# to live here, not in modules/darwin/nix-daemon-proxy.nix: the first
+# darwin-rebuild switch *itself* uses nix-daemon to fetch nixpkgs, so
+# the daemon needs the proxy in its env BEFORE switch runs. The Nix
+# module duplicates this for re-switches (idempotent).
+plist=/Library/LaunchDaemons/systems.determinate.nix-daemon.plist
+if [[ -n "${HTTPS_PROXY:-}" && -f "$plist" ]]; then
+  log "nix-daemon: inject proxy into launchd plist"
+  sudo /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables dict" "$plist" 2>/dev/null || true
+  for k in HTTP_PROXY HTTPS_PROXY http_proxy https_proxy ALL_PROXY all_proxy; do
+    v="${!k:-}"
+    [[ -z "$v" ]] && continue
+    sudo /usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:$k" "$plist" 2>/dev/null || true
+    sudo /usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:$k string $v" "$plist"
+  done
+  # `kickstart -k` doesn't pick up plist env changes — need full
+  # bootout/bootstrap. KeepAlive may respawn past bootout, kill
+  # stragglers by name to be sure.
+  sudo launchctl bootout system "$plist" 2>/dev/null || true
+  sudo pkill -9 -f nix-daemon 2>/dev/null || true
+  sleep 1
+  sudo launchctl bootstrap system "$plist"
+  sleep 3
+fi
+
 # (3) Fetch repo (tarball — no git dependency yet). Skip if present.
 if [[ ! -f "$DOTFILES_DIR/flake.nix" ]]; then
   log "Fetching $DOTFILES_REPO@$DOTFILES_REF → $DOTFILES_DIR"
