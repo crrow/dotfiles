@@ -31,12 +31,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Binary blobs (wallpapers) live in a separate private repo so this
-    # one stays small and text-only. `flake = false` means "fetch as a
-    # plain source tree, don't try to evaluate it as a flake".
-    # Switch to `github:crrow/wallpapers` if you ever flip the repo public.
-    wallpapers = {
-      url   = "git+ssh://git@github.com/crrow/wallpapers.git";
+    # Binary blobs live in a separate public repo so this one stays
+    # small and text-only. Layout inside that repo:
+    #   wallpaper/   -> consumed by modules/home/wallpaper.nix
+    #   <future>/    -> fonts / app-icons / screenshots / etc.
+    # `flake = false` means "fetch as a plain source tree".
+    assets = {
+      url   = "github:crrow/assets";
       flake = false;
     };
   };
