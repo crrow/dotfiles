@@ -33,9 +33,12 @@ in
   ###   * SeriousShanns Nerd Font Mono
   ###   * Ioskeley Mono
   ###   * Google Sans Code (variable + variable italic)
+  ###   * ComicShannsMono Nerd Font (Regular + Bold; upstream has no italic)
   ###
-  ### Menlo / Monaco / Courier New are Apple system fonts — already
-  ### present on every macOS install.
+  ### Apple system fonts — present on every macOS install, no bundling
+  ### needed. Reference these by family name directly:
+  ###   * Menlo / Monaco / Courier New
+  ###   * Hannotate SC / Hannotate TC
   ###
   home.file = bundledFontFiles;
 
