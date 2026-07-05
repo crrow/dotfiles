@@ -101,9 +101,17 @@
       );
 
       pkgs = nixpkgs.legacyPackages.${system};
-    in {
+
       darwinConfigurations = nixpkgs.lib.genAttrs hosts
         (name: mkDarwin (hostsDir + "/${name}"));
+    in {
+      inherit darwinConfigurations;
+
+      # `nix flake check` builds every host's system derivation — the
+      # one-command proof that main still builds before any switch.
+      # `--no-build` gives the cheaper eval-only variant (used by CI).
+      checks.${system} =
+        nixpkgs.lib.mapAttrs (_: cfg: cfg.system) darwinConfigurations;
 
       # `nix fmt` formats the flake with nixfmt — the RFC 166 community
       # standard.
