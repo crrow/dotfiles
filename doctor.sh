@@ -71,7 +71,8 @@ check_repo() {
   ok "flake.nix present"
 
   if command -v nix >/dev/null 2>&1; then
-    local log=/tmp/dotfiles-init-flake.log
+    local log
+    log=$(mktemp -t dotfiles-doctor-flake)
     if nix --extra-experimental-features 'nix-command flakes' \
          flake metadata --no-write-lock-file >"$log" 2>&1; then
       ok "flake evaluates"

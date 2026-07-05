@@ -55,7 +55,8 @@
       # applies to the outermost nix invocation; darwin-rebuild re-invokes
       # nix internally and that subprocess wouldn't see the var.
       user = if builtins.pathExists ./.user
-             then builtins.replaceStrings [ "\n" ] [ "" ] (builtins.readFile ./.user)
+             then builtins.replaceStrings [ "\n" "\r" " " "\t" ] [ "" "" "" "" ]
+                    (builtins.readFile ./.user)
              else "crrow";
 
       # mkDarwin :: path -> darwinSystem

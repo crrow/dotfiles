@@ -34,14 +34,15 @@ fail() {
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   owner=""
   [[ -f "$LOCK_DIR/pid" ]] && owner=$(<"$LOCK_DIR/pid")
-  if [[ -n "$owner" ]] && kill -0 "$owner" 2>/dev/null; then
-    fail "another install (pid $owner) is in progress"
+  if [[ -z "$owner" ]]; then
+    fail "lock $LOCK_DIR exists with no pid (crashed install?) — remove it manually and re-run"
   fi
+  kill -0 "$owner" 2>/dev/null && fail "another install (pid $owner) is in progress"
   rm -rf "$LOCK_DIR" && mkdir "$LOCK_DIR"
 fi
-printf '%s\n' "$$" >"$LOCK_DIR/pid"
 trap 'rm -rf "$LOCK_DIR"' EXIT
 trap 'rm -rf "$LOCK_DIR"; exit 130' INT TERM
+printf '%s\n' "$$" >"$LOCK_DIR/pid"
 
 # (1) Persist proxy if env has one. This file is the SINGLE source of
 # truth for every Nix module that needs proxy (sudoers env_keep, zshenv
@@ -57,9 +58,16 @@ if [[ -n "$proxy" ]]; then
   export HTTPS_PROXY="$proxy" HTTP_PROXY="$proxy" ALL_PROXY="$proxy"
   export https_proxy="$proxy" http_proxy="$proxy" all_proxy="$proxy"
   mkdir -p "$(dirname "$PROXY_FILE")"
-  printf '# Written by install.sh on %s\nexport HTTPS_PROXY=%q HTTP_PROXY=%q ALL_PROXY=%q\nexport https_proxy=%q http_proxy=%q all_proxy=%q\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    "$proxy" "$proxy" "$proxy" "$proxy" "$proxy" "$proxy" >"$PROXY_FILE"
+  # 0600: the proxy URL may carry credentials; never world-readable.
+  # Contract: even so, do NOT put user:pass in the proxy URL — it also
+  # flows into /etc/curlrc + /etc/gitconfig (0644) via modules/darwin/proxy.nix.
+  (
+    umask 077
+    printf '# Written by install.sh on %s\nexport HTTPS_PROXY=%q HTTP_PROXY=%q ALL_PROXY=%q\nexport https_proxy=%q http_proxy=%q all_proxy=%q\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      "$proxy" "$proxy" "$proxy" "$proxy" "$proxy" "$proxy" >"$PROXY_FILE"
+  )
+  chmod 600 "$PROXY_FILE"
   log "proxy: $proxy"
 fi
 
@@ -107,7 +115,7 @@ if [[ ! -f "$DOTFILES_DIR/flake.nix" ]]; then
   owner_repo=$(printf '%s' "$DOTFILES_REPO" |
     sed -E 's#.*github\.com[:/]([^/]+/[^/.]+)(\.git)?#\1#')
   mkdir -p "$DOTFILES_DIR"
-  curl -fsSL "https://codeload.github.com/${owner_repo}/tar.gz/refs/heads/${DOTFILES_REF}" |
+  curl --proto '=https' --tlsv1.2 -fsSL "https://codeload.github.com/${owner_repo}/tar.gz/refs/heads/${DOTFILES_REF}" |
     tar -xz -C "$DOTFILES_DIR" --strip-components=1
 fi
 
