@@ -17,10 +17,20 @@ set -uo pipefail
 IFS=$'\n\t'
 
 INPUT=$(cat)
-# Reach into the JSON for the command field without depending on jq.
-COMMAND=$(printf '%s' "$INPUT" \
-  | grep -o '"command":"[^"]*"' | head -1 \
-  | sed 's/"command":"//;s/"$//')
+# Real JSON parse — the old grep '"command":"[^"]*"' truncated at the
+# first escaped quote, letting `… "msg" && brew install x` slip through.
+# python3 ships with macOS; jq stays a non-dependency. Parse failure →
+# empty command → allow (hooks fail open, they are advisory).
+COMMAND=$(printf '%s' "$INPUT" | /usr/bin/python3 -c '
+import json, sys
+try:
+    print(json.load(sys.stdin).get("tool_input", {}).get("command", ""))
+except Exception:
+    pass
+' 2>/dev/null)
+# Collapse whitespace runs/newlines so multi-space or line-broken forms
+# still hit the substring patterns below.
+COMMAND=$(printf '%s' "$COMMAND" | tr -s '[:space:]' ' ')
 
 block() {
   printf 'BLOCKED: %s\n' "$1" >&2
