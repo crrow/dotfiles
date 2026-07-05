@@ -193,3 +193,20 @@ lint-nix:
     files=$(git ls-files '*.nix')
     [ -n "$files" ] || { echo "lint-nix: no .nix files"; exit 0; }
     nixfmt --check $files
+    # statix / deadnix have no dependable prebuilt binaries for mise, so
+    # they come from PATH (devShell) or the nix run fallback. Skipped with
+    # a notice where neither exists (e.g. the Linux CI lint job).
+    if command -v statix >/dev/null 2>&1; then
+      statix check .
+    elif command -v nix >/dev/null 2>&1; then
+      nix run nixpkgs#statix -- check .
+    else
+      echo "lint-nix: statix unavailable (skipped)"
+    fi
+    if command -v deadnix >/dev/null 2>&1; then
+      deadnix --fail $files
+    elif command -v nix >/dev/null 2>&1; then
+      nix run nixpkgs#deadnix -- --fail $files
+    else
+      echo "lint-nix: deadnix unavailable (skipped)"
+    fi
