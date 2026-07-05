@@ -16,9 +16,9 @@
     ./proxy.nix
   ];
 
-  home.username      = user;
+  home.username = user;
   home.homeDirectory = "/Users/${user}";
-  home.stateVersion  = "24.11";
+  home.stateVersion = "24.11";
 
   # User-level CLI tools. GUI apps go through homebrew.casks in darwin.nix
   # because the brew cask path is still the canonical install for most

@@ -20,30 +20,36 @@
 
 let
   vsm = pkgs.vscode-marketplace or { };
-  ovs = pkgs.open-vsx          or { };
+  ovs = pkgs.open-vsx or { };
 
   # lookupExt :: "publisher.ext-name" -> derivation | null
   # Marketplace first (broader catalog), then Open VSX, then give up.
   # Wrapped in tryEval so extensions that nixpkgs has marked unsupported
   # on the current platform (e.g. ms-vscode.cpptools on aarch64-darwin)
   # are silently dropped instead of aborting evaluation.
-  lookupExt = id:
+  lookupExt =
+    id:
     let
       parts = lib.splitString "." id;
-      pub   = builtins.head parts;
+      pub = builtins.head parts;
       # Extensions can have dots in the name (rare), rejoin the tail.
-      name  = lib.concatStringsSep "." (builtins.tail parts);
-      pickFrom = src:
-        let p = src.${pub} or null; in
-        if p != null && p ? ${name}
-        then let t = builtins.tryEval p.${name};
-             in if t.success then t.value else null
-        else null;
+      name = lib.concatStringsSep "." (builtins.tail parts);
+      pickFrom =
+        src:
+        let
+          p = src.${pub} or null;
+        in
+        if p != null && p ? ${name} then
+          let
+            t = builtins.tryEval p.${name};
+          in
+          if t.success then t.value else null
+        else
+          null;
       fromMarketplace = pickFrom vsm;
-      fromOpenVsx     = pickFrom ovs;
+      fromOpenVsx = pickFrom ovs;
     in
-      if fromMarketplace != null then fromMarketplace
-      else fromOpenVsx;
+    if fromMarketplace != null then fromMarketplace else fromOpenVsx;
 
   extensionIds = [
     # --- editor / themes / icons ---

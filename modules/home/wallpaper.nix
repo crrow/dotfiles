@@ -17,7 +17,7 @@
 
 {
   home.file."Pictures/wallpaper" = {
-    source    = inputs.assets + "/wallpaper";
+    source = inputs.assets + "/wallpaper";
     recursive = true;
   };
 }

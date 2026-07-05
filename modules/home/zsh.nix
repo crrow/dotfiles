@@ -12,7 +12,7 @@
 #   3. ~/.p10k.zsh is a separate dotfile under home/
 #      (home/dot_p10k.zsh) and symlinked in.
 {
-  home.file.".zshrc".source  = ../../home/dot_zshrc;
+  home.file.".zshrc".source = ../../home/dot_zshrc;
   home.file.".zshenv".source = ../../home/dot_zshenv;
   home.file.".p10k.zsh".source = ../../home/dot_p10k.zsh;
 }

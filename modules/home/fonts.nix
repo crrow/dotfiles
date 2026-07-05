@@ -7,21 +7,23 @@ let
   # Build a list of every regular file under ./fonts and symlink each
   # into ~/Library/Fonts so macOS picks them up at the user level.
   bundledNames = builtins.attrNames (builtins.readDir bundled);
-  bundledFontFiles = lib.listToAttrs (map
-    (name: {
-      name  = "Library/Fonts/${name}";
-      value = { source = "${bundled}/${name}"; };
-    })
-    bundledNames);
+  bundledFontFiles = lib.listToAttrs (
+    map (name: {
+      name = "Library/Fonts/${name}";
+      value = {
+        source = "${bundled}/${name}";
+      };
+    }) bundledNames
+  );
 in
 {
   ###
   ### Fonts packaged in nixpkgs — installed system-wide via the HM profile.
   ###
   home.packages = with pkgs; [
-    nerd-fonts.jetbrains-mono   # JetBrainsMono Nerd Font (+ Mono variant)
-    maple-mono.NF               # Maple Mono Nerd Font
-    comic-mono                  # Comic Mono
+    nerd-fonts.jetbrains-mono # JetBrainsMono Nerd Font (+ Mono variant)
+    maple-mono.NF # Maple Mono Nerd Font
+    comic-mono # Comic Mono
   ];
 
   ###

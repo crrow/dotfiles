@@ -4,8 +4,7 @@
 # yet, so we just symlink the files into place. Both files double as
 # plain-dotfile artefacts (chezmoi-source under home/dot_config/ghostty/).
 {
-  home.file.".config/ghostty/config".source =
-    ../../home/dot_config/ghostty/config;
+  home.file.".config/ghostty/config".source = ../../home/dot_config/ghostty/config;
 
   # Ghostty resolves `custom-shader = shaders/X.glsl` relative to the
   # config file location. The shader lives next to the config under

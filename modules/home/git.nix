@@ -6,7 +6,7 @@
 # git-side wiring (`pager = delta`, `interactive.diffFilter`, etc.) lives
 # in the gitconfig file alongside everything else.
 {
-  home.file.".gitconfig".source        = ../../home/dot_gitconfig;
+  home.file.".gitconfig".source = ../../home/dot_gitconfig;
   home.file.".gitignore_global".source = ../../home/dot_gitignore_global;
 
   home.packages = [ pkgs.delta ];

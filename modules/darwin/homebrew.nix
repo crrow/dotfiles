@@ -16,7 +16,7 @@
 
   nix-homebrew = {
     enable = true;
-    user   = user;
+    user = user;
     # If brew is already installed under /opt/homebrew (e.g. from a
     # pre-existing Mac), adopt that installation instead of failing.
     # Safer than `mutableTaps = false` — we still want manual `brew
@@ -27,9 +27,9 @@
   homebrew = {
     enable = true;
     onActivation = {
-      autoUpdate = false;       # updates land via `nix flake update`
-      upgrade    = true;
-      cleanup    = "uninstall";
+      autoUpdate = false; # updates land via `nix flake update`
+      upgrade = true;
+      cleanup = "uninstall";
     };
     taps = [
       # Deja: smarter zsh autosuggestions replacement.
@@ -47,17 +47,17 @@
     ];
     brews = [
       # Shell stack — sourced by home/dot_zshrc. Nothing else wires them.
-      "powerlevel10k"              # prompt theme
-      "zsh-syntax-highlighting"    # syntax highlighting for zsh
-      "deja"                       # smarter autosuggestions (replaces zsh-autosuggestions)
+      "powerlevel10k" # prompt theme
+      "zsh-syntax-highlighting" # syntax highlighting for zsh
+      "deja" # smarter autosuggestions (replaces zsh-autosuggestions)
 
       # Window manager + status bar
-      "yabai"                      # tiling window manager
-      "skhd"                       # hotkey daemon
-      "sketchybar"                 # status bar
-      "sketchybar-system-stats"    # CPU/mem/network event provider for sketchybar
-      "lua"                        # sketchybar's Lua-based config runtime
-      "luarocks"                   # for lunajson + SbarLua install (post-install)
+      "yabai" # tiling window manager
+      "skhd" # hotkey daemon
+      "sketchybar" # status bar
+      "sketchybar-system-stats" # CPU/mem/network event provider for sketchybar
+      "lua" # sketchybar's Lua-based config runtime
+      "luarocks" # for lunajson + SbarLua install (post-install)
     ];
     casks = [
       "ghostty"

@@ -24,26 +24,26 @@
   ###
   system.defaults = {
     NSGlobalDomain = {
-      AppleShowAllExtensions      = true;
-      ApplePressAndHoldEnabled    = false;
-      InitialKeyRepeat            = 15;
-      KeyRepeat                   = 2;
+      AppleShowAllExtensions = true;
+      ApplePressAndHoldEnabled = false;
+      InitialKeyRepeat = 15;
+      KeyRepeat = 2;
       NSAutomaticSpellingCorrectionEnabled = false;
     };
     dock = {
-      autohide              = true;
-      autohide-delay        = 0.0;
+      autohide = true;
+      autohide-delay = 0.0;
       autohide-time-modifier = 0.4;
-      orientation           = "left";
-      tilesize              = 48;
-      show-recents          = false;
-      mru-spaces            = false;
+      orientation = "left";
+      tilesize = 48;
+      show-recents = false;
+      mru-spaces = false;
     };
     finder = {
-      AppleShowAllFiles  = true;
-      ShowPathbar        = true;
-      ShowStatusBar      = true;
-      FXPreferredViewStyle = "Nlsv";   # list view
+      AppleShowAllFiles = true;
+      ShowPathbar = true;
+      ShowStatusBar = true;
+      FXPreferredViewStyle = "Nlsv"; # list view
     };
     trackpad.Clicking = true;
     screencapture.location = "~/Pictures/screenshots";

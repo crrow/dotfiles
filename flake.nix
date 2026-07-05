@@ -37,12 +37,21 @@
     #   <future>/    -> fonts / app-icons / screenshots / etc.
     # `flake = false` means "fetch as a plain source tree".
     assets = {
-      url   = "github:crrow/assets";
+      url = "github:crrow/assets";
       flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, nix-darwin, home-manager, nix-homebrew, nix-vscode-extensions, ... }@inputs:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      nix-darwin,
+      home-manager,
+      nix-homebrew,
+      nix-vscode-extensions,
+      ...
+    }@inputs:
     let
       system = "aarch64-darwin";
 
@@ -54,65 +63,66 @@
       # We read a file instead of `builtins.getEnv` because --impure only
       # applies to the outermost nix invocation; darwin-rebuild re-invokes
       # nix internally and that subprocess wouldn't see the var.
-      user = if builtins.pathExists ./.user
-             then builtins.replaceStrings [ "\n" "\r" " " "\t" ] [ "" "" "" "" ]
-                    (builtins.readFile ./.user)
-             else "crrow";
+      user =
+        if builtins.pathExists ./.user then
+          builtins.replaceStrings [ "\n" "\r" " " "\t" ] [ "" "" "" "" ] (builtins.readFile ./.user)
+        else
+          "crrow";
 
       # mkDarwin :: path -> darwinSystem
       # Each host under ./hosts/<name>/default.nix gets wrapped through
       # this; the host file imports modules/darwin and adds whatever
       # host-specific overrides it needs.
-      mkDarwin = hostPath: nix-darwin.lib.darwinSystem {
-        inherit system;
-        specialArgs = { inherit user inputs; };
-        modules = [
-          hostPath
+      mkDarwin =
+        hostPath:
+        nix-darwin.lib.darwinSystem {
+          inherit system;
+          specialArgs = { inherit user inputs; };
+          modules = [
+            hostPath
 
-          # Make `pkgs.vscode-marketplace.*` and `pkgs.open-vsx.*`
-          # available everywhere the shared nixpkgs is used (incl. HM,
-          # because useGlobalPkgs = true).
-          { nixpkgs.overlays = [ nix-vscode-extensions.overlays.default ]; }
+            # Make `pkgs.vscode-marketplace.*` and `pkgs.open-vsx.*`
+            # available everywhere the shared nixpkgs is used (incl. HM,
+            # because useGlobalPkgs = true).
+            { nixpkgs.overlays = [ nix-vscode-extensions.overlays.default ]; }
 
-          home-manager.darwinModules.home-manager
-          {
-            home-manager = {
-              useGlobalPkgs    = true;
-              useUserPackages  = true;
-              # If $HOME has a file that conflicts with one HM wants to
-              # symlink (common on fresh installs: a pre-existing .zshrc /
-              # .gitconfig / etc), rename it to <name>.hm-backup instead of
-              # aborting activation. Without this, the first switch on a
-              # populated $HOME fails noisily.
-              backupFileExtension = "hm-backup";
-              extraSpecialArgs = { inherit user inputs; };
-              users.${user}    = import ./modules/home;
-            };
-          }
-        ];
-      };
+            home-manager.darwinModules.home-manager
+            {
+              home-manager = {
+                useGlobalPkgs = true;
+                useUserPackages = true;
+                # If $HOME has a file that conflicts with one HM wants to
+                # symlink (common on fresh installs: a pre-existing .zshrc /
+                # .gitconfig / etc), rename it to <name>.hm-backup instead of
+                # aborting activation. Without this, the first switch on a
+                # populated $HOME fails noisily.
+                backupFileExtension = "hm-backup";
+                extraSpecialArgs = { inherit user inputs; };
+                users.${user} = import ./modules/home;
+              };
+            }
+          ];
+        };
 
       # Auto-discover every subdir under ./hosts as a darwinConfigurations
       # entry. Adding a new machine = `mkdir hosts/<hostname> && touch
       # hosts/<hostname>/default.nix` — no flake edit needed.
       hostsDir = ./hosts;
       hosts = builtins.attrNames (
-        nixpkgs.lib.filterAttrs (_: type: type == "directory")
-          (builtins.readDir hostsDir)
+        nixpkgs.lib.filterAttrs (_: type: type == "directory") (builtins.readDir hostsDir)
       );
 
       pkgs = nixpkgs.legacyPackages.${system};
 
-      darwinConfigurations = nixpkgs.lib.genAttrs hosts
-        (name: mkDarwin (hostsDir + "/${name}"));
-    in {
+      darwinConfigurations = nixpkgs.lib.genAttrs hosts (name: mkDarwin (hostsDir + "/${name}"));
+    in
+    {
       inherit darwinConfigurations;
 
       # `nix flake check` builds every host's system derivation — the
       # one-command proof that main still builds before any switch.
       # `--no-build` gives the cheaper eval-only variant (used by CI).
-      checks.${system} =
-        nixpkgs.lib.mapAttrs (_: cfg: cfg.system) darwinConfigurations;
+      checks.${system} = nixpkgs.lib.mapAttrs (_: cfg: cfg.system) darwinConfigurations;
 
       # `nix fmt` formats the flake with nixfmt — the RFC 166 community
       # standard.
@@ -124,9 +134,9 @@
       # of the daily Mac environment, just this repo's editing workflow.
       devShells.${system}.default = pkgs.mkShellNoCC {
         packages = [
-          pkgs.nixfmt-rfc-style  # `nix fmt` formatter (RFC 166)
-          pkgs.statix            # lint: Nix anti-patterns
-          pkgs.deadnix           # lint: unused bindings / imports
+          pkgs.nixfmt-rfc-style # `nix fmt` formatter (RFC 166)
+          pkgs.statix # lint: Nix anti-patterns
+          pkgs.deadnix # lint: unused bindings / imports
         ];
       };
     };
