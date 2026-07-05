@@ -17,7 +17,7 @@
   # .gitignore); if you want a pinned seed for fresh installs, ship it
   # under a different name and `cp` it in via an activation hook.
   home.file.".config/nvim" = {
-    source    = ../../nvim;
+    source    = ../../home/dot_config/nvim;
     recursive = true;
   };
 

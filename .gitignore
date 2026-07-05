@@ -5,7 +5,7 @@ result-*
 /.user
 # parallel-agent git worktrees; see CLAUDE.md "Parallel work via worktrees".
 /.worktrees/
-nvim/lazy-lock.json
+home/dot_config/nvim/lazy-lock.json
 
 .Trashes/
 .fseventsd/

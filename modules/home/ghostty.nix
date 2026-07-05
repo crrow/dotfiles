@@ -8,8 +8,8 @@
     ../../home/dot_config/ghostty/config;
 
   # Ghostty resolves `custom-shader = shaders/X.glsl` relative to the
-  # config file location. Symlink the shader next to it from the repo's
-  # original ghostty/ tree (not duplicated under home/).
+  # config file location. The shader lives next to the config under
+  # home/dot_config/ghostty/; symlink it into place.
   home.file.".config/ghostty/shaders/just-snow.glsl".source =
-    ../../ghostty/shaders/just-snow.glsl;
+    ../../home/dot_config/ghostty/shaders/just-snow.glsl;
 }

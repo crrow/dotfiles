@@ -83,7 +83,8 @@ Caveats for chezmoi mode:
   module handles this automatically.
 - chezmoi doesn't install packages. Brew yabai/skhd/sketchybar/ghostty/
   zed/powerlevel10k/zsh-syntax-highlighting/deja yourself if you want
-  the full setup.
+  the full setup. Their configs (yabai/skhd/sketchybar/nvim) now live
+  under `home/dot_config/` and apply via chezmoi like the rest.
 - The Nix and chezmoi mode share a single source-of-truth for config
   *content* — but ownership of the resulting file in `$HOME` will fight
   if you run both. Pick one.
@@ -93,7 +94,7 @@ Caveats for chezmoi mode:
 ```sh
 cd ~/code/personal/dotfiles
 just doctor                            # verify host is healthy (read-only)
-$EDITOR modules/home.nix               # change something
+$EDITOR modules/home/zsh.nix           # change something
 darwin-rebuild switch --flake .        # apply
 
 just update                            # git pull + switch
@@ -113,8 +114,12 @@ nothing partial gets left on disk.
 ├── flake.nix            # entry point: inputs (nixpkgs / nix-darwin / HM) + outputs
 ├── flake.lock           # pinned input revisions (committed)
 ├── modules/
-│   ├── darwin.nix       # nix-darwin: system defaults + Homebrew casks
-│   └── home.nix         # Home Manager: user CLI + zsh / starship / zellij / git
+│   ├── darwin/          # nix-darwin: one file per concern (system defaults,
+│   │                    #   homebrew, proxy, xcode-clt, …)
+│   └── home/            # Home Manager: one file per concern (zsh, git, mise,
+│                        #   neovim, ghostty, window-manager, …)
+├── home/                # chezmoi-style source tree for all plain dotfiles
+│                        #   (dot_zshrc, dot_p10k.zsh, dot_config/nvim, …)
 ├── Justfile             # local VM control for testing on a clean macOS
 ├── .claude/skills/      # how Claude verifies bootstrap on a fresh VM
 └── README.md

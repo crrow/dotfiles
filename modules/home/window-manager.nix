@@ -13,25 +13,25 @@
 
 {
   ###
-  ### yabai — config symlinked from ./yabai/yabairc
+  ### yabai — config symlinked from home/dot_config/yabai/yabairc
   ###
   home.file.".config/yabai/yabairc" = {
-    source     = ../../yabai/yabairc;
+    source     = ../../home/dot_config/yabai/yabairc;
     executable = true;
   };
 
   ###
-  ### skhd — config symlinked from ./skhd/skhdrc
+  ### skhd — config symlinked from home/dot_config/skhd/skhdrc
   ###
-  home.file.".config/skhd/skhdrc".source = ../../skhd/skhdrc;
+  home.file.".config/skhd/skhdrc".source = ../../home/dot_config/skhd/skhdrc;
 
   ###
-  ### sketchybar — whole tree symlinked from ./sketchybar/
+  ### sketchybar — whole tree symlinked from home/dot_config/sketchybar/
   ### Helpers' compiled binaries are NOT in the repo; rebuilt by the
   ### activation hook below.
   ###
   home.file.".config/sketchybar" = {
-    source    = ../../sketchybar;
+    source    = ../../home/dot_config/sketchybar;
     recursive = true;
   };
 
