@@ -1,8 +1,9 @@
+#!/usr/bin/env bash
 # Navigate to the sketchybar config directory
-cd $HOME/.config/sketchybar
+cd "$HOME/.config/sketchybar" || exit 1
 
 # Upgrade sketchybar-app-font
-curl -L https://github.com/kvndrsslr/sketchybar-app-font/releases/download/v2.0.32/sketchybar-app-font.ttf -o $HOME/Library/Fonts/sketchybar-app-font.ttf
+curl -L https://github.com/kvndrsslr/sketchybar-app-font/releases/download/v2.0.32/sketchybar-app-font.ttf -o "$HOME/Library/Fonts/sketchybar-app-font.ttf"
 
 # Pull the latest changes
 git pull
