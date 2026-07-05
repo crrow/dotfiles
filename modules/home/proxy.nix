@@ -17,14 +17,16 @@
   home.activation.proxyLaunchd =
     lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       proxy_env="$HOME/.config/dotfiles/proxy.env"
-      [ -f "$proxy_env" ] || exit 0
-
-      # shellcheck disable=SC1090
-      . "$proxy_env"
-      for k in HTTP_PROXY HTTPS_PROXY http_proxy https_proxy \
-               ALL_PROXY all_proxy NO_PROXY no_proxy; do
-        v="$(eval printf '%s' "\''${$k:-}")"
-        [ -n "$v" ] && $DRY_RUN_CMD /bin/launchctl setenv "$k" "$v"
-      done
+      # NB: never `exit` here — HM inlines this snippet into one big
+      # activation script; an exit would skip every later snippet.
+      if [ -f "$proxy_env" ]; then
+        # shellcheck disable=SC1090
+        . "$proxy_env"
+        for k in HTTP_PROXY HTTPS_PROXY http_proxy https_proxy \
+                 ALL_PROXY all_proxy NO_PROXY no_proxy; do
+          v="$(eval printf '%s' "\''${$k:-}")"
+          [ -n "$v" ] && $DRY_RUN_CMD /bin/launchctl setenv "$k" "$v"
+        done
+      fi
     '';
 }
