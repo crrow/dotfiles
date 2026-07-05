@@ -5,6 +5,7 @@
 #
 # Bootstrap on a fresh checkout: `mise install`
 [tools]
+just            = "latest"
 shellcheck      = "latest"
 shfmt           = "latest"
 "ubi:NixOS/nixfmt" = { version = "latest", exe = "nixfmt", matching = "nixfmt-static" }
