@@ -13,11 +13,14 @@
 #
 # Exit code: 0 if no fatal failures, 1 otherwise. Warnings never fail.
 
-set -uo pipefail   # not -e: we want every check to run, not abort on first miss
+set -uo pipefail # not -e: we want every check to run, not abort on first miss
 IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR" || { printf 'cannot cd %s\n' "$SCRIPT_DIR" >&2; exit 1; }
+cd "$SCRIPT_DIR" || {
+  printf 'cannot cd %s\n' "$SCRIPT_DIR" >&2
+  exit 1
+}
 
 # ----------------------------------------------------------------- logging ---
 
@@ -30,9 +33,12 @@ fi
 
 FATAL=0
 
-ok()      { printf '  %s[ ok ]%s   %s\n'   "$GREEN"  "$RESET" "$1"; }
-warn()    { printf '  %s[warn]%s   %s\n'   "$YELLOW" "$RESET" "$1"; }
-fail()    { printf '  %s[fail]%s   %s\n'   "$RED"    "$RESET" "$1"; FATAL=$((FATAL + 1)); }
+ok() { printf '  %s[ ok ]%s   %s\n' "$GREEN" "$RESET" "$1"; }
+warn() { printf '  %s[warn]%s   %s\n' "$YELLOW" "$RESET" "$1"; }
+fail() {
+  printf '  %s[fail]%s   %s\n' "$RED" "$RESET" "$1"
+  FATAL=$((FATAL + 1))
+}
 section() { printf '\n%s%s%s\n' "$BOLD" "$1" "$RESET"; }
 
 # --------------------------------------------------------------- toolchain ---
@@ -74,7 +80,7 @@ check_repo() {
     local log
     log=$(mktemp -t dotfiles-doctor-flake)
     if nix --extra-experimental-features 'nix-command flakes' \
-         flake metadata --no-write-lock-file >"$log" 2>&1; then
+      flake metadata --no-write-lock-file >"$log" 2>&1; then
       ok "flake evaluates"
     else
       fail "flake evaluation failed — see $log"

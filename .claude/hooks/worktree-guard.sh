@@ -55,30 +55,30 @@ esac
 if [[ $in_worktree -eq 1 ]]; then
   # Worktree rules: build-only, no global activation.
   case "$COMMAND" in
-    *"darwin-rebuild switch"*|*"darwin-rebuild activate"*)
+    *"darwin-rebuild switch"* | *"darwin-rebuild activate"*)
       block "darwin-rebuild switch inside a worktree: $COMMAND" \
-            "switch has global side effects; concurrent worktrees would clobber each other." \
-            "use 'darwin-rebuild build --flake .' here; merge to main before switching"
+        "switch has global side effects; concurrent worktrees would clobber each other." \
+        "use 'darwin-rebuild build --flake .' here; merge to main before switching"
       ;;
   esac
 else
   # Main worktree rules: no feature branches here.
   case "$COMMAND" in
-    *"git checkout -b "*|*"git switch -c "*|*"git checkout -B "*)
+    *"git checkout -b "* | *"git switch -c "* | *"git checkout -B "*)
       block "branch creation on the main worktree: $COMMAND" \
-            "parallel agents share this checkout; a branch switch here breaks the others." \
-            "git worktree add .worktrees/<slug> -b <slug>"
+        "parallel agents share this checkout; a branch switch here breaks the others." \
+        "git worktree add .worktrees/<slug> -b <slug>"
       ;;
-    *"git checkout "*|*"git switch "*)
+    *"git checkout "* | *"git switch "*)
       # Allow safe forms: returning to main, restoring files, detaching to a remote ref.
       case "$COMMAND" in
-        *"git checkout main"*|*"git switch main"*) exit 0 ;;
-        *"git checkout origin/"*|*"git switch -"*) exit 0 ;;
-        *"git checkout -- "*|*"git checkout --"*) exit 0 ;;
+        *"git checkout main"* | *"git switch main"*) exit 0 ;;
+        *"git checkout origin/"* | *"git switch -"*) exit 0 ;;
+        *"git checkout -- "* | *"git checkout --"*) exit 0 ;;
       esac
       block "branch switch on the main worktree: $COMMAND" \
-            "parallel agents share this checkout; a branch switch here breaks the others." \
-            "git worktree add .worktrees/<slug> <existing-branch>"
+        "parallel agents share this checkout; a branch switch here breaks the others." \
+        "git worktree add .worktrees/<slug> <existing-branch>"
       ;;
   esac
 fi
